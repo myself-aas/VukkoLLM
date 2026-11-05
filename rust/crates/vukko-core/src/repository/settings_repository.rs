@@ -35,17 +35,72 @@ pub struct SettingSpec {
 
 /// The settings the app owns, with the Kotlin preference names they came from.
 pub const SETTINGS: &[SettingSpec] = &[
-    SettingSpec { key: "activeWorkspaceId", column: "active_workspace_id", kind: SettingKind::Text, default: "ws_default" },
-    SettingSpec { key: "activeThreadId", column: "active_thread_id", kind: SettingKind::Text, default: "th_default" },
-    SettingSpec { key: "selectedProvider", column: "selected_provider", kind: SettingKind::Provider, default: "GEMINI" },
-    SettingSpec { key: "selectedModelId", column: "selected_model_id", kind: SettingKind::Text, default: "gemini-2.5-flash" },
-    SettingSpec { key: "instanceUrl", column: "instance_url", kind: SettingKind::Text, default: "http://10.0.2.2:3001" },
-    SettingSpec { key: "webSearchEnabled", column: "tool_web_search", kind: SettingKind::Boolean, default: "true" },
-    SettingSpec { key: "autoApproveTools", column: "tool_auto_approve", kind: SettingKind::Boolean, default: "true" },
-    SettingSpec { key: "biometricLockEnabled", column: "biometric_lock_enabled", kind: SettingKind::Boolean, default: "false" },
-    SettingSpec { key: "backupEnabled", column: "backup_enabled", kind: SettingKind::Boolean, default: "false" },
-    SettingSpec { key: "backupFrequencyHours", column: "backup_frequency", kind: SettingKind::Integer { min: 1, max: 168 }, default: "24" },
-    SettingSpec { key: "backupTarget", column: "backup_target", kind: SettingKind::BackupTarget, default: "GITHUB" },
+    SettingSpec {
+        key: "activeWorkspaceId",
+        column: "active_workspace_id",
+        kind: SettingKind::Text,
+        default: "ws_default",
+    },
+    SettingSpec {
+        key: "activeThreadId",
+        column: "active_thread_id",
+        kind: SettingKind::Text,
+        default: "th_default",
+    },
+    SettingSpec {
+        key: "selectedProvider",
+        column: "selected_provider",
+        kind: SettingKind::Provider,
+        default: "GEMINI",
+    },
+    SettingSpec {
+        key: "selectedModelId",
+        column: "selected_model_id",
+        kind: SettingKind::Text,
+        default: "gemini-2.5-flash",
+    },
+    SettingSpec {
+        key: "instanceUrl",
+        column: "instance_url",
+        kind: SettingKind::Text,
+        default: "http://10.0.2.2:3001",
+    },
+    SettingSpec {
+        key: "webSearchEnabled",
+        column: "tool_web_search",
+        kind: SettingKind::Boolean,
+        default: "true",
+    },
+    SettingSpec {
+        key: "autoApproveTools",
+        column: "tool_auto_approve",
+        kind: SettingKind::Boolean,
+        default: "true",
+    },
+    SettingSpec {
+        key: "biometricLockEnabled",
+        column: "biometric_lock_enabled",
+        kind: SettingKind::Boolean,
+        default: "false",
+    },
+    SettingSpec {
+        key: "backupEnabled",
+        column: "backup_enabled",
+        kind: SettingKind::Boolean,
+        default: "false",
+    },
+    SettingSpec {
+        key: "backupFrequencyHours",
+        column: "backup_frequency",
+        kind: SettingKind::Integer { min: 1, max: 168 },
+        default: "24",
+    },
+    SettingSpec {
+        key: "backupTarget",
+        column: "backup_target",
+        kind: SettingKind::BackupTarget,
+        default: "GITHUB",
+    },
 ];
 
 /// A typed settings snapshot, serialised to the shape `src/types` declares.
@@ -145,7 +200,10 @@ pub fn set(conn: &Connection, key: &str, value: &str) -> Result<(), VukkoError> 
     match spec.kind {
         SettingKind::Boolean => {
             if value != "true" && value != "false" {
-                return Err(VukkoError::validation(format!("{} must be true or false", key)));
+                return Err(VukkoError::validation(format!(
+                    "{} must be true or false",
+                    key
+                )));
             }
         }
         SettingKind::Integer { min, max } => {
@@ -159,7 +217,10 @@ pub fn set(conn: &Connection, key: &str, value: &str) -> Result<(), VukkoError> 
                 .iter()
                 .any(|provider| provider.preference_suffix() == value)
             {
-                return Err(VukkoError::validation(format!("unknown provider: {}", value)));
+                return Err(VukkoError::validation(format!(
+                    "unknown provider: {}",
+                    value
+                )));
             }
         }
         SettingKind::BackupTarget => {

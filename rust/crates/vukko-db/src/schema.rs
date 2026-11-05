@@ -82,15 +82,30 @@ pub const LEGACY_COLUMNS: &[(&str, &[&str])] = &[
 /// Columns added after the legacy schema. New nullable columns are allowed;
 /// removing a legacy column is not.
 pub const ADDED_COLUMNS: &[(&str, &[&str])] = &[
-    ("backup_runs", &["id", "status", "target", "trigger", "fileName", "checksum", "workspaceCount", "reason", "completedAt"]),
-    ("provider_secrets", &["provider", "vaultKey", "isConfigured", "updatedAt"]),
+    (
+        "backup_runs",
+        &[
+            "id",
+            "status",
+            "target",
+            "trigger",
+            "fileName",
+            "checksum",
+            "workspaceCount",
+            "reason",
+            "completedAt",
+        ],
+    ),
+    (
+        "provider_secrets",
+        &["provider", "vaultKey", "isConfigured", "updatedAt"],
+    ),
     ("app_settings", &["key", "value", "updatedAt"]),
 ];
 
 /// Live columns of a table, read with `PRAGMA table_info`.
 pub fn columns_of(conn: &rusqlite::Connection, table: &str) -> crate::DbResult<Vec<String>> {
-    let mut statement =
-        conn.prepare(&format!("PRAGMA table_info(\"{}\")", table))?;
+    let mut statement = conn.prepare(&format!("PRAGMA table_info(\"{}\")", table))?;
     let rows = statement.query_map([], |row| row.get::<_, String>(1))?;
     let mut columns = Vec::new();
     for column in rows {

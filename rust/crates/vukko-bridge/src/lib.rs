@@ -90,7 +90,9 @@ impl Engine {
     }
 
     pub fn initialize(&self) -> Result<InitializationState, BridgeError> {
-        let workspace_count = self.with_conn(|conn| workspace_repository::list(conn))?.len() as u32;
+        let workspace_count = self
+            .with_conn(|conn| workspace_repository::list(conn))?
+            .len() as u32;
         Ok(InitializationState {
             schema_ownership: if self.adoption.to_version > 0 {
                 "RUST".to_string()
@@ -145,8 +147,7 @@ impl Engine {
         workspace_id: &str,
         name: &str,
     ) -> Result<WorkspaceThread, BridgeError> {
-        let thread = self
-            .with_conn(|conn| thread_repository::create(conn, workspace_id, name))?;
+        let thread = self.with_conn(|conn| thread_repository::create(conn, workspace_id, name))?;
         self.events.emit(NativeEvent::ThreadUpdated(thread.clone()));
         Ok(thread)
     }
@@ -193,7 +194,8 @@ impl Engine {
     }
 
     pub fn set_message_favorite(&self, id: &str, is_favorite: bool) -> Result<(), BridgeError> {
-        let message = self.with_conn(|conn| message_repository::set_favorite(conn, id, is_favorite))?;
+        let message =
+            self.with_conn(|conn| message_repository::set_favorite(conn, id, is_favorite))?;
         self.events.emit(NativeEvent::MessageUpdated(message));
         Ok(())
     }
@@ -268,7 +270,8 @@ impl Engine {
                 },
             )
         })?;
-        if let Ok(workspace) = self.with_conn(|conn| workspace_repository::get(conn, workspace_id)) {
+        if let Ok(workspace) = self.with_conn(|conn| workspace_repository::get(conn, workspace_id))
+        {
             self.events.emit(NativeEvent::WorkspaceUpdated(workspace));
         }
         Ok(document)
@@ -342,7 +345,8 @@ mod tests {
             let conn = Connection::open(&path).expect("legacy open");
             conn.execute_batch(vukko_db::migrate::MIGRATIONS[0].sql)
                 .expect("legacy schema");
-            conn.pragma_update(None, "user_version", 1).expect("version");
+            conn.pragma_update(None, "user_version", 1)
+                .expect("version");
         }
 
         let engine = Engine::open(&path).expect("open");
@@ -361,7 +365,9 @@ mod tests {
 
         let workspace = engine.create_workspace("Bridge").expect("workspace");
         let thread = engine.create_thread(&workspace.id, "Chat").expect("thread");
-        let message = engine.append_user_message(&thread.id, "hi").expect("message");
+        let message = engine
+            .append_user_message(&thread.id, "hi")
+            .expect("message");
 
         assert_eq!(message.sender, vukko_core::domain::MessageSender::USER);
         assert_eq!(engine.list_messages(&thread.id).unwrap().len(), 1);
@@ -386,7 +392,9 @@ mod tests {
         let engine = Engine::open(&path).expect("open");
         let workspace = engine.create_workspace("Stream").expect("workspace");
         let thread = engine.create_thread(&workspace.id, "Chat").expect("thread");
-        let message = engine.append_user_message(&thread.id, "hello").expect("message");
+        let message = engine
+            .append_user_message(&thread.id, "hello")
+            .expect("message");
 
         // The fixture message is not streaming, so a delta must be refused.
         let error = engine
@@ -403,7 +411,9 @@ mod tests {
         let engine = Engine::open(&path).expect("open");
         let workspace = engine.create_workspace("Exports").expect("workspace");
         let thread = engine.create_thread(&workspace.id, "Chat").expect("thread");
-        engine.append_user_message(&thread.id, "hello").expect("message");
+        engine
+            .append_user_message(&thread.id, "hello")
+            .expect("message");
 
         let result = engine
             .export_thread(&thread.id, "markdown", 1_700_000_000_000)

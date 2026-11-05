@@ -99,7 +99,8 @@ pub fn seed(conn: &Connection) -> Result<(), VukkoError> {
         "th_default",
         &message_repository::NewMessage {
             sender: Some(crate::domain::MessageSender::USER),
-            content: "Hi! Can you tell me what Vukko is and how it guarantees data sovereignty?".into(),
+            content: "Hi! Can you tell me what Vukko is and how it guarantees data sovereignty?"
+                .into(),
             timestamp: Some(SEED_BASE - 120_000),
             ..Default::default()
         },
@@ -196,9 +197,10 @@ pub fn seeded_workspaces() -> Vec<Workspace> {
             name: "Default Workspace".into(),
             slug: "default-workspace".into(),
             description: "General purpose conversational AI assistant".into(),
-            system_prompt: "You are Vukko, an intelligent, privacy-first AI assistant. You provide \
+            system_prompt:
+                "You are Vukko, an intelligent, privacy-first AI assistant. You provide \
 thoughtful, precise answers and detailed explanations."
-                .into(),
+                    .into(),
             temperature: 0.7,
             query_mode: QueryMode::CHAT,
             vector_count: 28,
@@ -214,9 +216,10 @@ thoughtful, precise answers and detailed explanations."
             name: "Engineering & Code".into(),
             slug: "engineering-code".into(),
             description: "Coding assistant with syntax support, refactoring & debugging".into(),
-            system_prompt: "You are a senior staff software engineer. Provide high-quality Kotlin, \
+            system_prompt:
+                "You are a senior staff software engineer. Provide high-quality Kotlin, \
 TypeScript, and architectural patterns. Write clean, idiomatic code with concise explanations."
-                .into(),
+                    .into(),
             temperature: 0.2,
             query_mode: QueryMode::CHAT,
             vector_count: 64,
@@ -232,9 +235,10 @@ TypeScript, and architectural patterns. Write clean, idiomatic code with concise
             name: "Knowledge Base (RAG)".into(),
             slug: "knowledge-base-rag".into(),
             description: "Document-grounded question answering with citations".into(),
-            system_prompt: "You are a research analyst. Use retrieved document fragments to answer \
+            system_prompt:
+                "You are a research analyst. Use retrieved document fragments to answer \
 user questions. Always reference sources and state confidence."
-                .into(),
+                    .into(),
             temperature: 0.3,
             query_mode: QueryMode::QUERY,
             vector_count: 112,
@@ -249,11 +253,12 @@ user questions. Always reference sources and state confidence."
             id: "ws_agent".into(),
             name: "Autonomous Agent Hub".into(),
             slug: "autonomous-agent-hub".into(),
-            description: "Multi-step autonomous agent with planning, tool calling & document creation"
-                .into(),
-            system_prompt: "You are an autonomous AI agent capable of breaking complex objectives down \
+            description:
+                "Multi-step autonomous agent with planning, tool calling & document creation".into(),
+            system_prompt:
+                "You are an autonomous AI agent capable of breaking complex objectives down \
 into executable tasks. Use available tools to plan, verify, and complete deliverables."
-                .into(),
+                    .into(),
             temperature: 0.4,
             query_mode: QueryMode::AGENT,
             vector_count: 76,
@@ -269,11 +274,41 @@ into executable tasks. Use available tools to plan, verify, and complete deliver
 
 fn seeded_threads() -> Vec<(&'static str, &'static str, &'static str, &'static str, u32)> {
     vec![
-        ("th_default", "ws_default", "General Discussion", "general-discussion", 2),
-        ("th_notes", "ws_default", "Project Ideas & Brainstorm", "project-ideas", 0),
-        ("th_agent", "ws_agent", "Autonomous Multi-Step Tasks", "autonomous-tasks", 2),
-        ("th_dev_compose", "ws_dev", "Android Jetpack Compose Migration", "compose-migration", 0),
-        ("th_research_rag", "ws_research", "Architecture Whitepaper Q&A", "whitepaper-qa", 0),
+        (
+            "th_default",
+            "ws_default",
+            "General Discussion",
+            "general-discussion",
+            2,
+        ),
+        (
+            "th_notes",
+            "ws_default",
+            "Project Ideas & Brainstorm",
+            "project-ideas",
+            0,
+        ),
+        (
+            "th_agent",
+            "ws_agent",
+            "Autonomous Multi-Step Tasks",
+            "autonomous-tasks",
+            2,
+        ),
+        (
+            "th_dev_compose",
+            "ws_dev",
+            "Android Jetpack Compose Migration",
+            "compose-migration",
+            0,
+        ),
+        (
+            "th_research_rag",
+            "ws_research",
+            "Architecture Whitepaper Q&A",
+            "whitepaper-qa",
+            0,
+        ),
     ]
 }
 
@@ -312,7 +347,11 @@ mod tests {
 
     fn fresh() -> (Connection, std::path::PathBuf) {
         let mut path = std::env::temp_dir();
-        path.push(format!("vukko-bootstrap-{}-{}.db", std::process::id(), crate::repository::now_millis()));
+        path.push(format!(
+            "vukko-bootstrap-{}-{}.db",
+            std::process::id(),
+            crate::repository::now_millis()
+        ));
         let _ = std::fs::remove_file(&path);
         let (conn, _) = vukko_db::adopt(&path).expect("adopt");
         (conn, path)
@@ -324,7 +363,10 @@ mod tests {
         assert!(seed_if_empty(&mut conn).unwrap());
 
         let workspaces = workspace_repository::list(&conn).unwrap();
-        let ids: Vec<&str> = workspaces.iter().map(|workspace| workspace.id.as_str()).collect();
+        let ids: Vec<&str> = workspaces
+            .iter()
+            .map(|workspace| workspace.id.as_str())
+            .collect();
         assert_eq!(ids, vec!["ws_default", "ws_dev", "ws_research", "ws_agent"]);
 
         let threads = thread_repository::list(&conn, "ws_default").unwrap();

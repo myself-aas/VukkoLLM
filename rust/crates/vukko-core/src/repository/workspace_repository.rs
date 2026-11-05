@@ -38,7 +38,10 @@ fn from_row(row: &Row<'_>) -> rusqlite::Result<Workspace> {
 }
 
 pub fn list(conn: &Connection) -> Result<Vec<Workspace>, VukkoError> {
-    let sql = format!("SELECT {} FROM workspaces ORDER BY createdAt ASC, id ASC", COLUMNS);
+    let sql = format!(
+        "SELECT {} FROM workspaces ORDER BY createdAt ASC, id ASC",
+        COLUMNS
+    );
     let mut statement = conn.prepare(&sql)?;
     let rows = statement.query_map([], from_row)?;
     let mut workspaces = Vec::new();
@@ -62,7 +65,6 @@ pub struct NewWorkspace {
     pub system_prompt: Option<String>,
     pub temperature: Option<f32>,
 }
-
 
 pub fn create(conn: &Connection, input: &NewWorkspace) -> Result<Workspace, VukkoError> {
     let name = require_text(&input.name, "name", 120)?;
@@ -99,12 +101,8 @@ pub fn update(conn: &Connection, workspace: &Workspace) -> Result<Workspace, Vuk
     let existing = get(conn, &workspace.id)?;
     let name = require_text(&workspace.name, "name", 120)?;
     let temperature = require_range(workspace.temperature, "temperature", 0.0, 2.0)?;
-    let max_steps = require_range(
-        workspace.agent_max_steps as f32,
-        "agentMaxSteps",
-        1.0,
-        20.0,
-    )? as u32;
+    let max_steps =
+        require_range(workspace.agent_max_steps as f32, "agentMaxSteps", 1.0, 20.0)? as u32;
 
     conn.execute(
         "UPDATE workspaces SET name = ?2, description = ?3, systemPrompt = ?4, temperature = ?5, \
@@ -177,8 +175,22 @@ mod tests {
     #[test]
     fn duplicates_get_unique_slugs() {
         let conn = fresh_db("ws_slug");
-        let a = create(&conn, &NewWorkspace { name: "Work".into(), ..Default::default() }).unwrap();
-        let b = create(&conn, &NewWorkspace { name: "Work".into(), ..Default::default() }).unwrap();
+        let a = create(
+            &conn,
+            &NewWorkspace {
+                name: "Work".into(),
+                ..Default::default()
+            },
+        )
+        .unwrap();
+        let b = create(
+            &conn,
+            &NewWorkspace {
+                name: "Work".into(),
+                ..Default::default()
+            },
+        )
+        .unwrap();
         assert_eq!(a.slug, "work");
         assert_eq!(b.slug, "work-2");
     }
@@ -186,9 +198,23 @@ mod tests {
     #[test]
     fn list_is_oldest_first() {
         let conn = fresh_db("ws_list");
-        let first = create(&conn, &NewWorkspace { name: "First".into(), ..Default::default() }).unwrap();
+        let first = create(
+            &conn,
+            &NewWorkspace {
+                name: "First".into(),
+                ..Default::default()
+            },
+        )
+        .unwrap();
         std::thread::sleep(std::time::Duration::from_millis(2));
-        let second = create(&conn, &NewWorkspace { name: "Second".into(), ..Default::default() }).unwrap();
+        let second = create(
+            &conn,
+            &NewWorkspace {
+                name: "Second".into(),
+                ..Default::default()
+            },
+        )
+        .unwrap();
 
         let ids: Vec<String> = list(&conn).unwrap().into_iter().map(|w| w.id).collect();
         assert_eq!(ids, vec![first.id, second.id]);
@@ -197,8 +223,17 @@ mod tests {
     #[test]
     fn validation_rejects_empty_names_and_bad_temperatures() {
         let conn = fresh_db("ws_validation");
-        let empty = create(&conn, &NewWorkspace { name: "   ".into(), ..Default::default() });
-        assert_eq!(empty.unwrap_err().code, crate::domain::ErrorCode::VALIDATION);
+        let empty = create(
+            &conn,
+            &NewWorkspace {
+                name: "   ".into(),
+                ..Default::default()
+            },
+        );
+        assert_eq!(
+            empty.unwrap_err().code,
+            crate::domain::ErrorCode::VALIDATION
+        );
 
         let hot = create(
             &conn,
@@ -223,7 +258,14 @@ mod tests {
     #[test]
     fn delete_cascades_to_children() {
         let conn = fresh_db("ws_delete");
-        let workspace = create(&conn, &NewWorkspace { name: "Doomed".into(), ..Default::default() }).unwrap();
+        let workspace = create(
+            &conn,
+            &NewWorkspace {
+                name: "Doomed".into(),
+                ..Default::default()
+            },
+        )
+        .unwrap();
         conn.execute(
             "INSERT INTO chat_threads (id, workspaceId, name, slug, createdAt, updatedAt, messageCount, isPinned) \
              VALUES ('th_1', ?1, 'Chat', 'chat', 1, 1, 0, 0)",

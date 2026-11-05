@@ -17,8 +17,8 @@ use std::sync::Arc;
 use async_trait::async_trait;
 
 use super::{
-    descriptor, ChunkSink, ChatCompletionRequest, ChatCompletionResult, LlmProvider,
-    ProviderChunk, ProviderDescriptor, ProviderError,
+    descriptor, ChatCompletionRequest, ChatCompletionResult, ChunkSink, LlmProvider, ProviderChunk,
+    ProviderDescriptor, ProviderError,
 };
 
 /// A provider that replays a fixed script.
@@ -35,7 +35,10 @@ impl MockProvider {
     /// The default script: a short answer in two deltas.
     pub fn new() -> Self {
         Self {
-            script: vec!["Sovereignty ".to_string(), "is final authority.".to_string()],
+            script: vec![
+                "Sovereignty ".to_string(),
+                "is final authority.".to_string(),
+            ],
             cancel_after: 0,
         }
     }
@@ -64,7 +67,9 @@ impl MockProvider {
     /// Observed cancellation: stop after `chunks` chunks and report it.
     pub fn cancelling_after(chunks: usize) -> Self {
         Self {
-            script: (0..chunks + 2).map(|index| format!("chunk{} ", index)).collect(),
+            script: (0..chunks + 2)
+                .map(|index| format!("chunk{} ", index))
+                .collect(),
             cancel_after: chunks,
         }
     }
@@ -132,7 +137,12 @@ mod tests {
 
         assert_eq!(result.text, "Sovereignty is final authority.");
         assert_eq!(result.finish_reason.as_deref(), Some("stop"));
-        assert_eq!(sink.collected().last(), Some(&ProviderChunk::Done { finish_reason: "stop".into() }));
+        assert_eq!(
+            sink.collected().last(),
+            Some(&ProviderChunk::Done {
+                finish_reason: "stop".into()
+            })
+        );
     }
 
     #[tokio::test]

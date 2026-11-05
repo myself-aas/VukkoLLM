@@ -129,7 +129,13 @@ impl LlmProvider for Anthropic {
         sink: Arc<dyn ChunkSink>,
     ) -> Result<ChatCompletionResult, ProviderError> {
         let prepared = self.build_request(&request)?;
-        execute(self.descriptor(), self.transport.as_ref(), prepared, sink.as_ref()).await
+        execute(
+            self.descriptor(),
+            self.transport.as_ref(),
+            prepared,
+            sink.as_ref(),
+        )
+        .await
     }
 }
 
@@ -163,7 +169,9 @@ mod tests {
         assert_eq!(result.finish_reason.as_deref(), Some("end_turn"));
         assert_eq!(
             sink.collected().last(),
-            Some(&ProviderChunk::Done { finish_reason: "end_turn".into() })
+            Some(&ProviderChunk::Done {
+                finish_reason: "end_turn".into()
+            })
         );
     }
 
@@ -171,7 +179,10 @@ mod tests {
     async fn the_system_prompt_is_a_top_level_field() {
         let transport = FakeTransport::new(200, SSE);
         client(transport.clone())
-            .stream_chat(sample_request("claude-sonnet-4"), Arc::new(CollectingSink::new()))
+            .stream_chat(
+                sample_request("claude-sonnet-4"),
+                Arc::new(CollectingSink::new()),
+            )
             .await
             .ok();
 
@@ -227,7 +238,10 @@ mod tests {
     async fn a_streamed_error_event_fails_the_request() {
         let body = "data: {\"type\":\"error\",\"error\":{\"type\":\"overloaded_error\",\"message\":\"Overloaded\"}}\n\n";
         let error = client(FakeTransport::new(200, body))
-            .stream_chat(sample_request("claude-sonnet-4"), Arc::new(CollectingSink::new()))
+            .stream_chat(
+                sample_request("claude-sonnet-4"),
+                Arc::new(CollectingSink::new()),
+            )
             .await
             .expect_err("an error event is not a completion");
         assert_eq!(error.code, ErrorCode::NETWORK);
@@ -235,8 +249,12 @@ mod tests {
 
     #[test]
     fn a_missing_key_is_refused_at_build_time() {
-        let error = Anthropic::new("https://api.anthropic.com/v1", "", FakeTransport::new(200, ""))
-            .expect_err("an empty key is refused");
+        let error = Anthropic::new(
+            "https://api.anthropic.com/v1",
+            "",
+            FakeTransport::new(200, ""),
+        )
+        .expect_err("an empty key is refused");
         assert_eq!(error.code, ErrorCode::AUTHENTICATION);
     }
 }

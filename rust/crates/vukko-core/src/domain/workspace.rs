@@ -108,8 +108,14 @@ mod tests {
 
     #[test]
     fn query_mode_uses_kotlin_names() {
-        assert_eq!(serde_json::to_string(&QueryMode::AGENT).unwrap(), "\"AGENT\"");
-        assert_eq!(serde_json::to_string(&QueryMode::QUERY).unwrap(), "\"QUERY\"");
+        assert_eq!(
+            serde_json::to_string(&QueryMode::AGENT).unwrap(),
+            "\"AGENT\""
+        );
+        assert_eq!(
+            serde_json::to_string(&QueryMode::QUERY).unwrap(),
+            "\"QUERY\""
+        );
     }
 
     #[test]

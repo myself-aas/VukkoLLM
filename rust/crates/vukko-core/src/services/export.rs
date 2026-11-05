@@ -35,7 +35,10 @@ impl ExportFormat {
             "markdown" | "md" => Ok(Self::Markdown),
             "json" => Ok(Self::Json),
             "text" | "txt" => Ok(Self::Text),
-            other => Err(VukkoError::validation(format!("unknown export format: {}", other))),
+            other => Err(VukkoError::validation(format!(
+                "unknown export format: {}",
+                other
+            ))),
         }
     }
 
@@ -166,7 +169,13 @@ mod tests {
         )
         .unwrap();
         let thread = thread_repository::create(&conn, &workspace.id, "Thread").unwrap();
-        message_repository::append_user_turn(&conn, &thread.id, "Hello \"world\"\tand\\slash", None).unwrap();
+        message_repository::append_user_turn(
+            &conn,
+            &thread.id,
+            "Hello \"world\"\tand\\slash",
+            None,
+        )
+        .unwrap();
         message_repository::append(
             &conn,
             &thread.id,
@@ -189,9 +198,12 @@ mod tests {
     #[test]
     fn markdown_keeps_the_documented_header_and_citations() {
         let (conn, thread_id) = thread_with_messages("export_md");
-        let result = export_thread(&conn, &thread_id, ExportFormat::Markdown, 1_700_000_000_000).unwrap();
+        let result =
+            export_thread(&conn, &thread_id, ExportFormat::Markdown, 1_700_000_000_000).unwrap();
 
-        assert!(result.content.starts_with("# Vukko Chat Export (Local Sovereign Storage)\n"));
+        assert!(result
+            .content
+            .starts_with("# Vukko Chat Export (Local Sovereign Storage)\n"));
         assert!(result.content.contains("*Thread ID: "));
         assert!(result.content.contains("### USER"));
         assert!(result.content.contains("### ASSISTANT"));
@@ -230,7 +242,10 @@ mod tests {
     #[test]
     fn format_names_parse_like_the_kotlin_client() {
         assert_eq!(ExportFormat::parse("md").unwrap(), ExportFormat::Markdown);
-        assert_eq!(ExportFormat::parse("MARKDOWN").unwrap(), ExportFormat::Markdown);
+        assert_eq!(
+            ExportFormat::parse("MARKDOWN").unwrap(),
+            ExportFormat::Markdown
+        );
         assert_eq!(ExportFormat::parse(" json ").unwrap(), ExportFormat::Json);
         assert_eq!(ExportFormat::parse("txt").unwrap(), ExportFormat::Text);
         assert_eq!(

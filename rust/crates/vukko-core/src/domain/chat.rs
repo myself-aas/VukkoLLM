@@ -147,7 +147,10 @@ mod tests {
 
     #[test]
     fn sender_serializes_with_kotlin_names() {
-        assert_eq!(serde_json::to_string(&MessageSender::USER).unwrap(), "\"USER\"");
+        assert_eq!(
+            serde_json::to_string(&MessageSender::USER).unwrap(),
+            "\"USER\""
+        );
         assert_eq!(
             serde_json::to_string(&MessageSender::ASSISTANT).unwrap(),
             "\"ASSISTANT\""

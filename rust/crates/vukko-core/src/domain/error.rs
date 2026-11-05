@@ -73,7 +73,9 @@ impl VukkoError {
         } else {
             value.into()
         };
-        self.details.get_or_insert_with(BTreeMap::new).insert(key, value);
+        self.details
+            .get_or_insert_with(BTreeMap::new)
+            .insert(key, value);
         self
     }
 
@@ -123,9 +125,17 @@ impl std::error::Error for VukkoError {}
 
 fn looks_secret(key: &str) -> bool {
     let lowered = key.to_ascii_lowercase();
-    ["key", "token", "secret", "password", "authorization", "credential", "cookie"]
-        .iter()
-        .any(|needle| lowered.contains(needle))
+    [
+        "key",
+        "token",
+        "secret",
+        "password",
+        "authorization",
+        "credential",
+        "cookie",
+    ]
+    .iter()
+    .any(|needle| lowered.contains(needle))
 }
 
 impl From<rusqlite::Error> for VukkoError {
@@ -136,7 +146,9 @@ impl From<rusqlite::Error> for VukkoError {
             }
             // Corruption is surfaced as STORAGE with a retry hint, never hidden.
             rusqlite::Error::SqliteFailure(_, message) => VukkoError::storage(
-                message.clone().unwrap_or_else(|| "SQLite failure".to_string()),
+                message
+                    .clone()
+                    .unwrap_or_else(|| "SQLite failure".to_string()),
             ),
             other => VukkoError::storage(other.to_string()),
         }

@@ -123,7 +123,11 @@ mod tests {
         .into();
         assert!(busy.retryable);
 
-        let corrupt: BridgeError = DbError::Unsupported { found: 9, supported: 5 }.into();
+        let corrupt: BridgeError = DbError::Unsupported {
+            found: 9,
+            supported: 5,
+        }
+        .into();
         assert_eq!(corrupt.code, ErrorCode::UNSUPPORTED);
         assert!(!corrupt.retryable);
     }

@@ -65,9 +65,10 @@ impl OpenAiCompatible {
 
         if !request.attachments.is_empty() {
             // Vision input rides on the last user turn, as the API expects.
-            let last_user = messages.iter_mut().rev().find(|message| {
-                message.get("role").and_then(Value::as_str) == Some("user")
-            });
+            let last_user = messages
+                .iter_mut()
+                .rev()
+                .find(|message| message.get("role").and_then(Value::as_str) == Some("user"));
             let Some(last_user) = last_user else {
                 return Err(ProviderError::validation(
                     "attachments need a user message to attach to",
@@ -140,7 +141,13 @@ impl LlmProvider for OpenAiCompatible {
             )));
         }
         let prepared = self.build_request(&request)?;
-        execute(self.descriptor(), self.transport.as_ref(), prepared, sink.as_ref()).await
+        execute(
+            self.descriptor(),
+            self.transport.as_ref(),
+            prepared,
+            sink.as_ref(),
+        )
+        .await
     }
 }
 
@@ -162,8 +169,13 @@ mod tests {
     );
 
     fn client(transport: Arc<FakeTransport>) -> OpenAiCompatible {
-        OpenAiCompatible::new(ProviderType::OPENAI, "https://api.openai.com/v1/", "sk-test", transport)
-            .expect("client builds with a key")
+        OpenAiCompatible::new(
+            ProviderType::OPENAI,
+            "https://api.openai.com/v1/",
+            "sk-test",
+            transport,
+        )
+        .expect("client builds with a key")
     }
 
     #[tokio::test]
@@ -182,7 +194,9 @@ mod tests {
             sink.collected(),
             vec![
                 ProviderChunk::Text { text: "Hi".into() },
-                ProviderChunk::Done { finish_reason: "stop".into() },
+                ProviderChunk::Done {
+                    finish_reason: "stop".into()
+                },
             ]
         );
     }
@@ -190,7 +204,10 @@ mod tests {
     #[tokio::test]
     async fn the_request_matches_the_typescript_shape() {
         let transport = FakeTransport::new(200, SSE);
-        client(transport.clone()).stream_chat(request(), Arc::new(CollectingSink::new())).await.ok();
+        client(transport.clone())
+            .stream_chat(request(), Arc::new(CollectingSink::new()))
+            .await
+            .ok();
 
         let sent = transport.last();
         assert_eq!(sent.url, "https://api.openai.com/v1/chat/completions");
@@ -269,7 +286,10 @@ mod tests {
 
         // The image rides on the last user turn, which is index 2 here.
         assert_eq!(body["messages"][2]["content"][1]["type"], "image_url");
-        assert_eq!(body["messages"][2]["content"][1]["image_url"]["url"], PNG_DATA_URI);
+        assert_eq!(
+            body["messages"][2]["content"][1]["image_url"]["url"],
+            PNG_DATA_URI
+        );
     }
 
     #[tokio::test]

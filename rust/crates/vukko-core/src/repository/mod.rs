@@ -65,7 +65,11 @@ pub fn unique_slug(
     desired: &str,
     ignore_id: Option<&str>,
 ) -> Result<String, VukkoError> {
-    let base = if desired.is_empty() { "unnamed" } else { desired };
+    let base = if desired.is_empty() {
+        "unnamed"
+    } else {
+        desired
+    };
     let mut candidate = base.to_string();
     let mut attempt = 2;
     loop {
@@ -73,9 +77,10 @@ pub fn unique_slug(
             "SELECT COUNT(*) FROM \"{}\" WHERE slug = ?1 AND id IS NOT ?2",
             table
         );
-        let clashes: i64 = conn.query_row(&sql, rusqlite::params![candidate, ignore_id], |row| {
-            row.get(0)
-        })?;
+        let clashes: i64 =
+            conn.query_row(&sql, rusqlite::params![candidate, ignore_id], |row| {
+                row.get(0)
+            })?;
         if clashes == 0 {
             return Ok(candidate);
         }

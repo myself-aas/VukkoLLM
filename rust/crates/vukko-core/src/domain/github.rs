@@ -129,6 +129,9 @@ mod tests {
 
     #[test]
     fn pull_request_state_uses_kotlin_names() {
-        assert_eq!(serde_json::to_string(&PRState::MERGED).unwrap(), "\"MERGED\"");
+        assert_eq!(
+            serde_json::to_string(&PRState::MERGED).unwrap(),
+            "\"MERGED\""
+        );
     }
 }

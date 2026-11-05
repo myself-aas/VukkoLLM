@@ -29,10 +29,8 @@ impl Gemini {
     ) -> Result<Self, ProviderError> {
         let api_key = api_key.into().trim().to_string();
         if api_key.is_empty() {
-            return Err(
-                ProviderError::authentication("GEMINI requires an API key")
-                    .with_detail("provider", "GEMINI"),
-            );
+            return Err(ProviderError::authentication("GEMINI requires an API key")
+                .with_detail("provider", "GEMINI"));
         }
         Ok(Self {
             base_url: base_url.into().trim_end_matches('/').to_string(),
@@ -105,8 +103,18 @@ fn urlencode(value: &str) -> String {
     let mut out = String::with_capacity(value.len());
     for byte in value.bytes() {
         match byte {
-            b'A'..=b'Z' | b'a'..=b'z' | b'0'..=b'9' | b'-' | b'_' | b'.' | b'!' | b'~' | b'*'
-            | b'\'' | b'(' | b')' => out.push(byte as char),
+            b'A'..=b'Z'
+            | b'a'..=b'z'
+            | b'0'..=b'9'
+            | b'-'
+            | b'_'
+            | b'.'
+            | b'!'
+            | b'~'
+            | b'*'
+            | b'\''
+            | b'('
+            | b')' => out.push(byte as char),
             other => out.push_str(&format!("%{:02X}", other)),
         }
     }
@@ -136,7 +144,13 @@ impl LlmProvider for Gemini {
         sink: Arc<dyn ChunkSink>,
     ) -> Result<ChatCompletionResult, ProviderError> {
         let prepared = self.build_request(&request)?;
-        execute(self.descriptor(), self.transport.as_ref(), prepared, sink.as_ref()).await
+        execute(
+            self.descriptor(),
+            self.transport.as_ref(),
+            prepared,
+            sink.as_ref(),
+        )
+        .await
     }
 }
 
@@ -182,7 +196,9 @@ mod tests {
         assert!(matches!(chunks[2], ProviderChunk::Usage { .. }));
         assert_eq!(
             chunks[3],
-            ProviderChunk::Done { finish_reason: "STOP".into() },
+            ProviderChunk::Done {
+                finish_reason: "STOP".into()
+            },
             "exactly one done, emitted last"
         );
     }
@@ -194,7 +210,10 @@ mod tests {
             "data: {\"candidates\":[{\"content\":{\"parts\":[{\"text\":\"answer\"}]},\"finishReason\":\"STOP\"}]}\n\n",
         );
         let result = client(FakeTransport::new(200, body))
-            .stream_chat(sample_request("gemini-2.5-flash"), Arc::new(CollectingSink::new()))
+            .stream_chat(
+                sample_request("gemini-2.5-flash"),
+                Arc::new(CollectingSink::new()),
+            )
             .await
             .expect("stream succeeds");
 
@@ -206,14 +225,23 @@ mod tests {
     async fn the_request_uses_the_gemini_vocabulary() {
         let transport = FakeTransport::new(200, SSE);
         client(transport.clone())
-            .stream_chat(sample_request("gemini-2.5-flash"), Arc::new(CollectingSink::new()))
+            .stream_chat(
+                sample_request("gemini-2.5-flash"),
+                Arc::new(CollectingSink::new()),
+            )
             .await
             .ok();
 
         let sent = transport.last();
-        assert!(sent.url.ends_with("/models/gemini-2.5-flash:streamGenerateContent?alt=sse"));
+        assert!(sent
+            .url
+            .ends_with("/models/gemini-2.5-flash:streamGenerateContent?alt=sse"));
         assert_eq!(sent.header("x-goog-api-key"), Some("AIza-test"));
-        assert_eq!(sent.header("authorization"), None, "Gemini has no bearer auth");
+        assert_eq!(
+            sent.header("authorization"),
+            None,
+            "Gemini has no bearer auth"
+        );
 
         let body: Value = serde_json::from_str(&sent.body).expect("body is JSON");
         assert_eq!(body["systemInstruction"]["parts"][0]["text"], "Be brief.");

@@ -30,7 +30,6 @@ use crate::domain::{Citation, ProviderType, VukkoError};
 
 pub use factory::{select, stream as stream_selection, ProviderSelection};
 
-
 /// Which execution path a provider uses (Step 5.2).
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "SCREAMING_SNAKE_CASE")]
@@ -255,7 +254,10 @@ impl CollectingSink {
     }
 
     pub fn collected(&self) -> Vec<ProviderChunk> {
-        self.chunks.lock().map(|chunks| chunks.clone()).unwrap_or_default()
+        self.chunks
+            .lock()
+            .map(|chunks| chunks.clone())
+            .unwrap_or_default()
     }
 
     pub fn cancel(&self) {
@@ -419,7 +421,11 @@ pub fn error_from_response(status: u16, body: &str) -> ProviderError {
         400 | 422 => ProviderError::validation(message),
         408 | 429 => ProviderError::network(message, true).with_detail(
             "reason",
-            if status == 429 { "RATE_LIMITED" } else { "UPSTREAM" },
+            if status == 429 {
+                "RATE_LIMITED"
+            } else {
+                "UPSTREAM"
+            },
         ),
         status if status >= 500 => ProviderError::network(message, true),
         0 => ProviderError::network(message, true),
@@ -568,12 +574,12 @@ pub fn wire_role(role: &str, assistant_role: &str) -> String {
 
 /// `data:<mime>;base64,<data>` split into its parts.
 pub fn split_data_uri(data_uri: &str) -> Result<(&str, &str), ProviderError> {
-    let rest = data_uri.strip_prefix("data:").ok_or_else(|| {
-        ProviderError::validation("attachment is not a base64 data URI")
-    })?;
-    let (meta, data) = rest.split_once(',').ok_or_else(|| {
-        ProviderError::validation("attachment is not a base64 data URI")
-    })?;
+    let rest = data_uri
+        .strip_prefix("data:")
+        .ok_or_else(|| ProviderError::validation("attachment is not a base64 data URI"))?;
+    let (meta, data) = rest
+        .split_once(',')
+        .ok_or_else(|| ProviderError::validation("attachment is not a base64 data URI"))?;
     let mime_type = meta.split(';').next().unwrap_or_default();
     if mime_type.is_empty() || !meta.contains("base64") {
         return Err(ProviderError::validation(
@@ -635,7 +641,10 @@ pub fn fold_chunks(chunks: &[ProviderChunk]) -> ChatCompletionResult {
         match chunk {
             ProviderChunk::Text { text } => result.text.push_str(text),
             ProviderChunk::Reasoning { text } => {
-                result.reasoning.get_or_insert_with(String::new).push_str(text);
+                result
+                    .reasoning
+                    .get_or_insert_with(String::new)
+                    .push_str(text);
             }
             ProviderChunk::ToolCall { tool_name, input } => {
                 result.tool_calls.push((tool_name.clone(), input.clone()));
@@ -666,8 +675,14 @@ mod tests {
 
     #[test]
     fn only_ollama_is_local() {
-        assert_eq!(descriptor(ProviderType::OLLAMA).backend, BackendKind::Ollama);
-        assert_eq!(descriptor(ProviderType::GEMINI).backend, BackendKind::Remote);
+        assert_eq!(
+            descriptor(ProviderType::OLLAMA).backend,
+            BackendKind::Ollama
+        );
+        assert_eq!(
+            descriptor(ProviderType::GEMINI).backend,
+            BackendKind::Remote
+        );
         assert!(!descriptor(ProviderType::OLLAMA).requires_api_key);
         assert!(descriptor(ProviderType::OPENAI).requires_api_key);
     }
@@ -700,7 +715,10 @@ mod tests {
 
     #[test]
     fn credentials_never_echo_back_from_an_error() {
-        let error = error_from_response(401, r#"{"error":{"message":"bad key sk-live-abcdef123456"}}"#);
+        let error = error_from_response(
+            401,
+            r#"{"error":{"message":"bad key sk-live-abcdef123456"}}"#,
+        );
         assert!(!error.message.contains("sk-live-abcdef123456"));
         assert!(error.message.contains("[redacted key]"));
     }
@@ -710,12 +728,16 @@ mod tests {
         let chunks = vec![
             ProviderChunk::Text { text: "Hel".into() },
             ProviderChunk::Text { text: "lo".into() },
-            ProviderChunk::Reasoning { text: "think".into() },
+            ProviderChunk::Reasoning {
+                text: "think".into(),
+            },
             ProviderChunk::Usage {
                 input_tokens: 3,
                 output_tokens: 2,
             },
-            ProviderChunk::Done { finish_reason: "stop".into() },
+            ProviderChunk::Done {
+                finish_reason: "stop".into(),
+            },
         ];
         let result = fold_chunks(&chunks);
         assert_eq!(result.text, "Hello");

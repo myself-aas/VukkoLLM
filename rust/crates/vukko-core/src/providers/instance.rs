@@ -117,7 +117,13 @@ impl LlmProvider for InstanceServer {
         sink: Arc<dyn ChunkSink>,
     ) -> Result<ChatCompletionResult, ProviderError> {
         let prepared = self.build_request(&request);
-        execute(self.descriptor(), self.transport.as_ref(), prepared, sink.as_ref()).await
+        execute(
+            self.descriptor(),
+            self.transport.as_ref(),
+            prepared,
+            sink.as_ref(),
+        )
+        .await
     }
 }
 
@@ -178,15 +184,22 @@ mod tests {
         .await
         .ok();
 
-        assert_eq!(transport.last().header("authorization"), Some("Bearer lan-key"));
+        assert_eq!(
+            transport.last().header("authorization"),
+            Some("Bearer lan-key")
+        );
     }
 
     #[tokio::test]
     async fn a_bad_gateway_is_retryable_and_keeps_the_body_text() {
-        let error = InstanceServer::new(DEFAULT_BASE_URL, None, FakeTransport::new(502, "Bad Gateway"))
-            .stream_chat(sample_request("vukko-rag"), Arc::new(CollectingSink::new()))
-            .await
-            .expect_err("a 502 is not a completion");
+        let error = InstanceServer::new(
+            DEFAULT_BASE_URL,
+            None,
+            FakeTransport::new(502, "Bad Gateway"),
+        )
+        .stream_chat(sample_request("vukko-rag"), Arc::new(CollectingSink::new()))
+        .await
+        .expect_err("a 502 is not a completion");
 
         assert_eq!(error.code, ErrorCode::NETWORK);
         assert!(error.retryable);
@@ -205,7 +218,9 @@ mod tests {
         assert_eq!(error.code, ErrorCode::AUTHENTICATION);
         assert_eq!(
             sink.collected(),
-            vec![ProviderChunk::Text { text: "partial".into() }],
+            vec![ProviderChunk::Text {
+                text: "partial".into()
+            }],
             "the partial text is delivered, but the request still fails"
         );
     }

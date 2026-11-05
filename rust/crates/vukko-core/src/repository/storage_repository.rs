@@ -6,7 +6,9 @@
 use rusqlite::Connection;
 use serde::{Deserialize, Serialize};
 
-use crate::domain::{IntegrityCheckResult, SovereignStorageStats, TableCount, VukkoError, DATABASE_NAME};
+use crate::domain::{
+    IntegrityCheckResult, SovereignStorageStats, TableCount, VukkoError, DATABASE_NAME,
+};
 use crate::repository::now_millis;
 
 const COUNTED_TABLES: &[&str] = &[
@@ -41,7 +43,8 @@ pub fn run_integrity_check(
     conn: &Connection,
     backup_present: bool,
 ) -> Result<IntegrityCheckResult, VukkoError> {
-    let integrity_check: String = conn.pragma_query_value(None, "integrity_check", |row| row.get(0))?;
+    let integrity_check: String =
+        conn.pragma_query_value(None, "integrity_check", |row| row.get(0))?;
 
     let mut foreign_key_violations = 0u32;
     {

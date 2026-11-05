@@ -217,9 +217,9 @@ fn map_status(status: u16, body: &str) -> VukkoError {
     let message = extract_message(body);
     match status {
         401 => VukkoError::authentication(message),
-        403 if message.to_ascii_lowercase().contains("rate limit") => {
-            VukkoError::network(message).retryable(true).with_detail("reason", "RATE_LIMITED")
-        }
+        403 if message.to_ascii_lowercase().contains("rate limit") => VukkoError::network(message)
+            .retryable(true)
+            .with_detail("reason", "RATE_LIMITED"),
         403 => VukkoError::authentication(message),
         404 => VukkoError::new(crate::domain::ErrorCode::NOT_FOUND, message),
         408 | 429 => VukkoError::network(message).retryable(true),
@@ -241,9 +241,9 @@ fn extract_message(body: &str) -> String {
 }
 
 fn repository_path(repository: &str) -> Result<String, VukkoError> {
-    let valid = repository
-        .split_once('/')
-        .is_some_and(|(owner, name)| !owner.is_empty() && !name.is_empty() && !repository.contains(' '));
+    let valid = repository.split_once('/').is_some_and(|(owner, name)| {
+        !owner.is_empty() && !name.is_empty() && !repository.contains(' ')
+    });
     if !valid {
         return Err(VukkoError::validation(format!(
             "invalid repository name: {}",
@@ -367,7 +367,10 @@ impl GitHubService for RealGitHubService {
         }
 
         let raw: Vec<RawRepo> = self
-            .get(&format!("{}/user/repos?per_page=100&sort=updated", API), true)
+            .get(
+                &format!("{}/user/repos?per_page=100&sort=updated", API),
+                true,
+            )
             .await?;
         raw.into_iter()
             .map(|repo| {
@@ -410,7 +413,11 @@ impl GitHubService for RealGitHubService {
             html_url: String,
         }
 
-        let path = format!("{}/repos/{}/commits?per_page=50", API, repository_path(repository)?);
+        let path = format!(
+            "{}/repos/{}/commits?per_page=50",
+            API,
+            repository_path(repository)?
+        );
         let raw: Vec<RawCommit> = self.get(&path, true).await?;
         raw.into_iter()
             .map(|commit| {
@@ -590,12 +597,10 @@ impl GitHubService for RealGitHubService {
                     Some("expired_token") => DeviceFlowPoll::Failed(VukkoError::authentication(
                         "The GitHub code expired; start again",
                     )),
-                    Some("access_denied") => {
-                        DeviceFlowPoll::Failed(VukkoError::authentication("GitHub access was denied"))
-                    }
-                    _ => DeviceFlowPoll::Failed(VukkoError::network(
-                        "GitHub returned no token",
+                    Some("access_denied") => DeviceFlowPoll::Failed(VukkoError::authentication(
+                        "GitHub access was denied",
                     )),
+                    _ => DeviceFlowPoll::Failed(VukkoError::network("GitHub returned no token")),
                 }
             }
             // A transport failure is reported, never turned into a token.
@@ -779,10 +784,7 @@ mod tests {
             _url: &str,
             _headers: Vec<(String, String)>,
         ) -> Result<HttpOutcome, ProviderError> {
-            self.verbs
-                .lock()
-                .expect("lock")
-                .push("GET".to_string());
+            self.verbs.lock().expect("lock").push("GET".to_string());
             Ok(HttpOutcome {
                 status: self.status,
                 body: self.body.clone(),
@@ -795,10 +797,7 @@ mod tests {
             _headers: Vec<(String, String)>,
             _body: String,
         ) -> Result<HttpOutcome, ProviderError> {
-            self.verbs
-                .lock()
-                .expect("lock")
-                .push("POST".to_string());
+            self.verbs.lock().expect("lock").push("POST".to_string());
             Ok(HttpOutcome {
                 status: self.status,
                 body: self.body.clone(),
@@ -819,7 +818,10 @@ mod tests {
 
     #[tokio::test]
     async fn a_profile_is_mapped_with_ids_kept_as_strings() {
-        let profile = linked(FakeGitHubTransport::new(200, PROFILE)).profile().await.unwrap();
+        let profile = linked(FakeGitHubTransport::new(200, PROFILE))
+            .profile()
+            .await
+            .unwrap();
         assert_eq!(profile.id, "583231");
         assert_eq!(profile.login, "octocat");
         assert_eq!(profile.public_repos, 8);
@@ -860,7 +862,10 @@ mod tests {
     #[tokio::test]
     async fn a_rate_limit_is_retryable_network_and_a_missing_repo_is_not_found() {
         let limited = RealGitHubService::new(
-            FakeGitHubTransport::new(403, r#"{"message":"API rate limit exceeded for user ID 1."}"#),
+            FakeGitHubTransport::new(
+                403,
+                r#"{"message":"API rate limit exceeded for user ID 1."}"#,
+            ),
             Arc::new(MemoryTokenStore::new(Some("t"))),
             "client",
             Arc::new(|| 0),
@@ -886,7 +891,10 @@ mod tests {
     #[test]
     fn timestamps_are_epoch_milliseconds() {
         assert_eq!(parse_timestamp("1970-01-01T00:00:00Z").unwrap(), 0);
-        assert_eq!(parse_timestamp("2026-01-02T03:04:05Z").unwrap(), 1_767_323_045_000);
+        assert_eq!(
+            parse_timestamp("2026-01-02T03:04:05Z").unwrap(),
+            1_767_323_045_000
+        );
         assert!(parse_timestamp("not a date").is_err());
     }
 
@@ -894,13 +902,19 @@ mod tests {
     async fn the_device_flow_stores_only_the_returned_token() {
         let tokens = Arc::new(MemoryTokenStore::new(None));
         let service = RealGitHubService::new(
-            FakeGitHubTransport::new(200, r#"{"access_token":"gho_fromgithub","token_type":"bearer"}"#),
+            FakeGitHubTransport::new(
+                200,
+                r#"{"access_token":"gho_fromgithub","token_type":"bearer"}"#,
+            ),
             tokens.clone(),
             "client",
             Arc::new(|| 0),
         );
 
-        assert_eq!(service.poll_device_flow("dev-1").await, DeviceFlowPoll::Connected);
+        assert_eq!(
+            service.poll_device_flow("dev-1").await,
+            DeviceFlowPoll::Connected
+        );
         assert_eq!(tokens.read().as_deref(), Some("gho_fromgithub"));
     }
 
@@ -912,7 +926,10 @@ mod tests {
             "client",
             Arc::new(|| 0),
         );
-        assert_eq!(service.poll_device_flow("dev-1").await, DeviceFlowPoll::Pending);
+        assert_eq!(
+            service.poll_device_flow("dev-1").await,
+            DeviceFlowPoll::Pending
+        );
     }
 
     #[tokio::test]

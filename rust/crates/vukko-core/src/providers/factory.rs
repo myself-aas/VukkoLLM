@@ -65,9 +65,11 @@ pub fn select(
             let base_url = resolve_base_url(*provider, base_url);
             match descriptor(*provider).backend {
                 BackendKind::Remote => match provider {
-                    ProviderType::ANTHROPIC => {
-                        Arc::new(Anthropic::new(base_url.clone(), api_key.clone(), transport)?)
-                    }
+                    ProviderType::ANTHROPIC => Arc::new(Anthropic::new(
+                        base_url.clone(),
+                        api_key.clone(),
+                        transport,
+                    )?),
                     ProviderType::GEMINI => {
                         Arc::new(Gemini::new(base_url.clone(), api_key.clone(), transport)?)
                     }
@@ -161,23 +163,36 @@ mod tests {
             ProviderType::ANTHROPIC,
             ProviderType::INSTANCE,
         ] {
-            let selection = select(remote(provider, "key"), FakeTransport::new(200, "")).expect("builds");
+            let selection =
+                select(remote(provider, "key"), FakeTransport::new(200, "")).expect("builds");
             assert_eq!(selection.provider().descriptor().provider, provider);
-            assert_eq!(selection.provider().descriptor().protocol, descriptor(provider).protocol);
+            assert_eq!(
+                selection.provider().descriptor().protocol,
+                descriptor(provider).protocol
+            );
         }
         assert_eq!(descriptor(ProviderType::GROQ).protocol, Protocol::OpenAiSse);
     }
 
     #[test]
     fn an_empty_base_url_falls_back_to_the_documented_default() {
-        let _selection = select(remote(ProviderType::OPENAI, "k"), FakeTransport::new(200, ""))
-            .expect("builds");
+        let _selection = select(
+            remote(ProviderType::OPENAI, "k"),
+            FakeTransport::new(200, ""),
+        )
+        .expect("builds");
         assert_eq!(
             descriptor(ProviderType::OPENAI).default_base_url,
             "https://api.openai.com/v1"
         );
-        assert_eq!(resolve_base_url(ProviderType::GROQ, ""), "https://api.groq.com/openai/v1");
-        assert_eq!(resolve_base_url(ProviderType::GROQ, "http://x/"), "http://x");
+        assert_eq!(
+            resolve_base_url(ProviderType::GROQ, ""),
+            "https://api.groq.com/openai/v1"
+        );
+        assert_eq!(
+            resolve_base_url(ProviderType::GROQ, "http://x/"),
+            "http://x"
+        );
     }
 
     #[test]
@@ -192,7 +207,10 @@ mod tests {
 
         assert_eq!(selection.mode().kind(), BackendKind::Ollama);
         assert!(!selection.is_on_device());
-        assert_eq!(selection.provider().descriptor().provider, ProviderType::OLLAMA);
+        assert_eq!(
+            selection.provider().descriptor().provider,
+            ProviderType::OLLAMA
+        );
     }
 
     #[test]
@@ -207,15 +225,22 @@ mod tests {
 
         assert_eq!(error.code, ErrorCode::UNSUPPORTED);
         assert_eq!(
-            error.details.as_ref().and_then(|details| details.get("code")).map(String::as_str),
+            error
+                .details
+                .as_ref()
+                .and_then(|details| details.get("code"))
+                .map(String::as_str),
             Some("EMBEDDED_UNAVAILABLE")
         );
     }
 
     #[test]
     fn a_local_provider_cannot_be_configured_as_remote() {
-        let error = select(remote(ProviderType::OLLAMA, ""), FakeTransport::new(200, ""))
-            .expect_err("Ollama is not a remote backend");
+        let error = select(
+            remote(ProviderType::OLLAMA, ""),
+            FakeTransport::new(200, ""),
+        )
+        .expect_err("Ollama is not a remote backend");
         assert_eq!(error.code, ErrorCode::UNSUPPORTED);
     }
 
@@ -231,11 +256,16 @@ mod tests {
     #[tokio::test]
     async fn streaming_through_a_selection_returns_the_normalised_result() {
         let body = "data: {\"type\":\"delta\",\"text\":\"hi\"}\n{\"type\":\"done\",\"finishReason\":\"stop\"}\n";
-        let selection = select(remote(ProviderType::INSTANCE, ""), FakeTransport::new(200, body))
-            .expect("builds");
+        let selection = select(
+            remote(ProviderType::INSTANCE, ""),
+            FakeTransport::new(200, body),
+        )
+        .expect("builds");
         let sink = Arc::new(CollectingSink::new());
 
-        let result = stream(&selection, sample_request("m"), sink).await.expect("streams");
+        let result = stream(&selection, sample_request("m"), sink)
+            .await
+            .expect("streams");
         assert_eq!(result.text, "hi");
         assert_eq!(result.finish_reason.as_deref(), Some("stop"));
     }
@@ -248,9 +278,13 @@ mod tests {
         )
         .expect("builds");
 
-        let error = stream(&selection, sample_request("m"), Arc::new(CollectingSink::new()))
-            .await
-            .expect_err("a 401 is not a completion");
+        let error = stream(
+            &selection,
+            sample_request("m"),
+            Arc::new(CollectingSink::new()),
+        )
+        .await
+        .expect_err("a 401 is not a completion");
         assert_eq!(error.code, ErrorCode::AUTHENTICATION);
         assert!(!error.retryable);
     }

@@ -157,8 +157,7 @@ fn state_path_for(path: &Path) -> PathBuf {
 /// Validates a migrated database: integrity, referential integrity, and that no
 /// legacy row disappeared.
 fn validate(conn: &Connection, expected: &[(&'static str, i64)]) -> DbResult<()> {
-    let integrity: String =
-        conn.pragma_query_value(None, "integrity_check", |row| row.get(0))?;
+    let integrity: String = conn.pragma_query_value(None, "integrity_check", |row| row.get(0))?;
     if integrity != "ok" {
         return Err(DbError::Validation {
             message: format!("integrity_check returned: {}", integrity),
@@ -415,11 +414,7 @@ mod tests {
 
     fn temp_db(name: &str) -> PathBuf {
         let mut path = std::env::temp_dir();
-        path.push(format!(
-            "vukko-db-test-{}-{}.db",
-            name,
-            now_millis()
-        ));
+        path.push(format!("vukko-db-test-{}-{}.db", name, now_millis()));
         let _ = fs::remove_file(&path);
         path
     }
@@ -428,8 +423,10 @@ mod tests {
     fn legacy_database(name: &str) -> PathBuf {
         let path = temp_db(name);
         let conn = Connection::open(&path).expect("open");
-        conn.execute_batch(MIGRATIONS[0].sql).expect("legacy schema");
-        conn.pragma_update(None, "user_version", 1).expect("version");
+        conn.execute_batch(MIGRATIONS[0].sql)
+            .expect("legacy schema");
+        conn.pragma_update(None, "user_version", 1)
+            .expect("version");
         conn.execute(
             "INSERT INTO workspaces (id, name, slug, description, systemPrompt, temperature, queryMode, vectorCount, documentCount, createdAt, agentMaxSteps, agentAllowWebSearch, agentAllowFileCreation, agentAllowDocumentSearch) VALUES ('ws_default', 'Default', 'default', '', 'prompt', 0.7, 'CHAT', 5, 1, 1700000000000, 5, 1, 1, 1)",
             [],
@@ -574,16 +571,14 @@ mod tests {
         }
 
         let error = adopt(&path).expect_err("must refuse orphans");
-        assert!(matches!(
-            error,
-            DbError::Validation {
-                restored: true,
-                ..
-            }
-        ));
+        assert!(matches!(error, DbError::Validation { restored: true, .. }));
 
         let conn = Connection::open(&path).unwrap();
-        assert_eq!(schema_version(&conn).unwrap(), 1, "version must be untouched");
+        assert_eq!(
+            schema_version(&conn).unwrap(),
+            1,
+            "version must be untouched"
+        );
         let orphans: i64 = conn
             .query_row(
                 "SELECT COUNT(*) FROM chat_messages WHERE id = 'orphan'",

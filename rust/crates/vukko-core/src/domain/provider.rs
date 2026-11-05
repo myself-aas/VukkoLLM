@@ -107,14 +107,49 @@ fn model(
 pub fn default_models() -> Vec<LLMModel> {
     use ProviderType::*;
     vec![
-        model("gemini-2.5-flash", "Gemini 2.5 Flash", GEMINI, "1M", true, true),
+        model(
+            "gemini-2.5-flash",
+            "Gemini 2.5 Flash",
+            GEMINI,
+            "1M",
+            true,
+            true,
+        ),
         model("gemini-2.5-pro", "Gemini 2.5 Pro", GEMINI, "2M", true, true),
-        model("gemini-1.5-flash", "Gemini 1.5 Flash", GEMINI, "1M", true, false),
-        model("deepseek-chat", "DeepSeek-V3", DEEPSEEK, "64k", false, false),
-        model("deepseek-reasoner", "DeepSeek-R1 (Reasoning)", DEEPSEEK, "64k", false, true),
+        model(
+            "gemini-1.5-flash",
+            "Gemini 1.5 Flash",
+            GEMINI,
+            "1M",
+            true,
+            false,
+        ),
+        model(
+            "deepseek-chat",
+            "DeepSeek-V3",
+            DEEPSEEK,
+            "64k",
+            false,
+            false,
+        ),
+        model(
+            "deepseek-reasoner",
+            "DeepSeek-R1 (Reasoning)",
+            DEEPSEEK,
+            "64k",
+            false,
+            true,
+        ),
         model("gpt-4o", "GPT-4o", OPENAI, "128k", true, false),
         model("gpt-4o-mini", "GPT-4o mini", OPENAI, "128k", true, false),
-        model("o3-mini", "o3-mini (Reasoning)", OPENAI, "128k", false, true),
+        model(
+            "o3-mini",
+            "o3-mini (Reasoning)",
+            OPENAI,
+            "128k",
+            false,
+            true,
+        ),
         model(
             "claude-3-5-sonnet-20241022",
             "Claude 3.5 Sonnet",
@@ -123,11 +158,46 @@ pub fn default_models() -> Vec<LLMModel> {
             true,
             false,
         ),
-        model("claude-3-5-haiku-20241022", "Claude 3.5 Haiku", ANTHROPIC, "200k", false, false),
-        model("llama-3.3-70b-versatile", "Llama 3.3 70B (Groq)", GROQ, "128k", false, false),
-        model("mixtral-8x7b-32768", "Mixtral 8x7B (Groq)", GROQ, "32k", false, false),
-        model("llama3.2:latest", "Llama 3.2 3B (Local)", OLLAMA, "8k", false, false),
-        model("deepseek-r1:8b", "DeepSeek R1 8B (Local)", OLLAMA, "8k", false, true),
+        model(
+            "claude-3-5-haiku-20241022",
+            "Claude 3.5 Haiku",
+            ANTHROPIC,
+            "200k",
+            false,
+            false,
+        ),
+        model(
+            "llama-3.3-70b-versatile",
+            "Llama 3.3 70B (Groq)",
+            GROQ,
+            "128k",
+            false,
+            false,
+        ),
+        model(
+            "mixtral-8x7b-32768",
+            "Mixtral 8x7B (Groq)",
+            GROQ,
+            "32k",
+            false,
+            false,
+        ),
+        model(
+            "llama3.2:latest",
+            "Llama 3.2 3B (Local)",
+            OLLAMA,
+            "8k",
+            false,
+            false,
+        ),
+        model(
+            "deepseek-r1:8b",
+            "DeepSeek R1 8B (Local)",
+            OLLAMA,
+            "8k",
+            false,
+            true,
+        ),
         model(
             "vukko-workspace-default",
             "Instance Workspace LLM",
@@ -161,7 +231,10 @@ mod tests {
 
     #[test]
     fn provider_order_and_names_match_kotlin() {
-        let names: Vec<&str> = ProviderType::all().iter().map(|p| p.display_name()).collect();
+        let names: Vec<&str> = ProviderType::all()
+            .iter()
+            .map(|p| p.display_name())
+            .collect();
         assert_eq!(
             names,
             vec![

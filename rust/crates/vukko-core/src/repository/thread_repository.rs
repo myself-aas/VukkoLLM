@@ -54,7 +54,11 @@ pub fn get(conn: &Connection, id: &str) -> Result<WorkspaceThread, VukkoError> {
         .ok_or_else(|| VukkoError::not_found(format!("thread {}", id)))
 }
 
-pub fn create(conn: &Connection, workspace_id: &str, name: &str) -> Result<WorkspaceThread, VukkoError> {
+pub fn create(
+    conn: &Connection,
+    workspace_id: &str,
+    name: &str,
+) -> Result<WorkspaceThread, VukkoError> {
     let workspace = workspace_repository::get(conn, workspace_id)?;
     let name = require_text(name, "name", 120)?;
     let id = new_id("th");
@@ -80,7 +84,11 @@ pub fn rename(conn: &Connection, id: &str, name: &str) -> Result<WorkspaceThread
     get(conn, id)
 }
 
-pub fn set_pinned(conn: &Connection, id: &str, is_pinned: bool) -> Result<WorkspaceThread, VukkoError> {
+pub fn set_pinned(
+    conn: &Connection,
+    id: &str,
+    is_pinned: bool,
+) -> Result<WorkspaceThread, VukkoError> {
     let thread = get(conn, id)?;
     conn.execute(
         "UPDATE chat_threads SET isPinned = ?2 WHERE id = ?1",
@@ -199,7 +207,10 @@ mod tests {
 
         let listed = list(&conn, &workspace.id).unwrap();
         assert_eq!(listed[0].message_count, 2);
-        assert_eq!(listed[0].last_message_snippet.as_deref(), Some("second message"));
+        assert_eq!(
+            listed[0].last_message_snippet.as_deref(),
+            Some("second message")
+        );
     }
 
     #[test]

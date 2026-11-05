@@ -262,7 +262,10 @@ mod tests {
 
         assert_eq!(result.status, BackupStatus::COMPLETED);
         assert_eq!(result.workspace_count, 1);
-        assert_eq!(result.file_name.as_deref(), Some("vukko_backup_20260101_000000.json"));
+        assert_eq!(
+            result.file_name.as_deref(),
+            Some("vukko_backup_20260101_000000.json")
+        );
         assert_eq!(result.checksum.as_ref().map(String::len), Some(64));
         assert!(result.reason.is_none());
     }
@@ -357,16 +360,16 @@ mod tests {
     #[test]
     fn archive_names_are_sortable_and_timestamped() {
         assert_eq!(archive_file_name(0), "vukko_backup_19700101_000000.json");
-        assert_eq!(
-            archive_file_name(NOW),
-            "vukko_backup_20260101_000000.json"
-        );
+        assert_eq!(archive_file_name(NOW), "vukko_backup_20260101_000000.json");
     }
 
     #[test]
     fn the_widget_snapshot_truncates_without_splitting_characters() {
         let snapshot = WidgetSnapshot::new("Personal", "Thread", &"é".repeat(400), NOW);
-        assert_eq!(snapshot.last_message_preview.chars().count(), WIDGET_PREVIEW_LIMIT);
+        assert_eq!(
+            snapshot.last_message_preview.chars().count(),
+            WIDGET_PREVIEW_LIMIT
+        );
         assert_eq!(snapshot.active_workspace_name, "Personal");
         assert_eq!(snapshot.updated_at, NOW);
     }

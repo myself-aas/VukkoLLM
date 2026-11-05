@@ -53,7 +53,12 @@ impl fmt::Display for DbError {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
             DbError::Corrupted { path, message } => {
-                write!(f, "database at {} cannot be read: {}", path.display(), message)
+                write!(
+                    f,
+                    "database at {} cannot be read: {}",
+                    path.display(),
+                    message
+                )
             }
             DbError::Unsupported { found, supported } => write!(
                 f,

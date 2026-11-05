@@ -9,7 +9,9 @@ use std::sync::{Arc, Mutex};
 
 use async_trait::async_trait;
 
-use super::{ChatCompletionRequest, HttpTransport, PreparedRequest, ProviderError, ProviderMessage};
+use super::{
+    ChatCompletionRequest, HttpTransport, PreparedRequest, ProviderError, ProviderMessage,
+};
 
 /// Records requests and replays one fixed response.
 pub struct FakeTransport {

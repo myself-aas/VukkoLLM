@@ -32,7 +32,10 @@ impl Ollama {
         } else {
             base_url.trim_end_matches('/').to_string()
         };
-        Self { base_url, transport }
+        Self {
+            base_url,
+            transport,
+        }
     }
 
     pub fn build_request(&self, request: &ChatCompletionRequest) -> PreparedRequest {
@@ -92,7 +95,13 @@ impl LlmProvider for Ollama {
             );
         }
         let prepared = self.build_request(&request);
-        execute(self.descriptor(), self.transport.as_ref(), prepared, sink.as_ref()).await
+        execute(
+            self.descriptor(),
+            self.transport.as_ref(),
+            prepared,
+            sink.as_ref(),
+        )
+        .await
     }
 }
 
@@ -121,7 +130,9 @@ mod tests {
         assert_eq!(result.usage, Some((9, 2)));
         assert_eq!(
             sink.collected().last(),
-            Some(&ProviderChunk::Done { finish_reason: "stop".into() })
+            Some(&ProviderChunk::Done {
+                finish_reason: "stop".into()
+            })
         );
     }
 
@@ -186,6 +197,9 @@ mod tests {
     #[test]
     fn an_empty_base_url_falls_back_to_localhost() {
         let client = Ollama::new("", FakeTransport::new(200, ""));
-        assert_eq!(client.build_request(&sample_request("m")).url, "http://127.0.0.1:11434/api/chat");
+        assert_eq!(
+            client.build_request(&sample_request("m")).url,
+            "http://127.0.0.1:11434/api/chat"
+        );
     }
 }

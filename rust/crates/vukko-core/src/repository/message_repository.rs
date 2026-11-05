@@ -23,7 +23,11 @@ const COLUMNS: &str = "id, threadId, sender, content, timestamp, thinking, think
 /// Maximum number of tags accepted for a single message.
 pub const MAX_TAGS: usize = 32;
 
-fn parse_json<T: serde::de::DeserializeOwned>(raw: &str, message_id: &str, column: &str) -> Result<Vec<T>, VukkoError> {
+fn parse_json<T: serde::de::DeserializeOwned>(
+    raw: &str,
+    message_id: &str,
+    column: &str,
+) -> Result<Vec<T>, VukkoError> {
     serde_json::from_str(raw).map_err(|error| {
         VukkoError::storage(format!(
             "malformed {} in message {}: {}",
@@ -43,8 +47,16 @@ fn from_row(row: &Row<'_>) -> Result<ChatMessage, VukkoError> {
         timestamp: row.get::<_, Timestamp>("timestamp")?,
         thinking: row.get("thinking")?,
         thinking_duration_ms: row.get("thinkingDurationMs")?,
-        citations: parse_json::<Citation>(&row.get::<_, String>("citationsJson")?, &id, "citationsJson")?,
-        tools_used: parse_json::<ToolCall>(&row.get::<_, String>("toolsUsedJson")?, &id, "toolsUsedJson")?,
+        citations: parse_json::<Citation>(
+            &row.get::<_, String>("citationsJson")?,
+            &id,
+            "citationsJson",
+        )?,
+        tools_used: parse_json::<ToolCall>(
+            &row.get::<_, String>("toolsUsedJson")?,
+            &id,
+            "toolsUsedJson",
+        )?,
         attachments: parse_json::<MessageAttachment>(
             &row.get::<_, String>("attachmentsJson")?,
             &id,
@@ -52,7 +64,11 @@ fn from_row(row: &Row<'_>) -> Result<ChatMessage, VukkoError> {
         )?,
         is_streaming: row.get::<_, i64>("isStreaming")? != 0,
         is_agent_execution: row.get::<_, i64>("isAgentExecution")? != 0,
-        agent_steps: parse_json::<AgentStep>(&row.get::<_, String>("agentStepsJson")?, &id, "agentStepsJson")?,
+        agent_steps: parse_json::<AgentStep>(
+            &row.get::<_, String>("agentStepsJson")?,
+            &id,
+            "agentStepsJson",
+        )?,
         created_document_id: row.get("createdDocumentId")?,
         created_document_name: row.get("createdDocumentName")?,
         is_favorite: row.get::<_, i64>("isFavorite")? != 0,
@@ -106,14 +122,20 @@ pub struct NewMessage {
 }
 
 /// Inserts a message and refreshes the thread counters.
-pub fn append(conn: &Connection, thread_id: &str, input: &NewMessage) -> Result<ChatMessage, VukkoError> {
+pub fn append(
+    conn: &Connection,
+    thread_id: &str,
+    input: &NewMessage,
+) -> Result<ChatMessage, VukkoError> {
     // Fails with NOT_FOUND when the thread is gone, before anything is written.
     let thread = thread_repository::get(conn, thread_id)?;
     let sender = input.sender.unwrap_or(MessageSender::USER);
     let content = require_text(&input.content, "content", 200_000)?;
     let timestamp = input.timestamp.unwrap_or_else(now_millis);
     if timestamp <= 0 {
-        return Err(VukkoError::validation("timestamp must be positive Unix milliseconds"));
+        return Err(VukkoError::validation(
+            "timestamp must be positive Unix milliseconds",
+        ));
     }
 
     let id = new_id("msg");
@@ -171,7 +193,11 @@ pub fn append_user_turn(
     )
 }
 
-pub fn set_favorite(conn: &Connection, id: &str, is_favorite: bool) -> Result<ChatMessage, VukkoError> {
+pub fn set_favorite(
+    conn: &Connection,
+    id: &str,
+    is_favorite: bool,
+) -> Result<ChatMessage, VukkoError> {
     get(conn, id)?;
     conn.execute(
         "UPDATE chat_messages SET isFavorite = ?2 WHERE id = ?1",
@@ -269,7 +295,10 @@ pub fn complete(
 /// `thinking` so the UI can show it without inventing a message.
 pub fn fail(conn: &Connection, id: &str, reason: &str) -> Result<ChatMessage, VukkoError> {
     let message = get(conn, id)?;
-    conn.execute("UPDATE chat_messages SET isStreaming = 0 WHERE id = ?1", [id])?;
+    conn.execute(
+        "UPDATE chat_messages SET isStreaming = 0 WHERE id = ?1",
+        [id],
+    )?;
     thread_repository::refresh_stats(conn, &message.thread_id, now_millis())?;
     tracing::warn!(message_id = %id, reason = %reason, "chat generation failed");
     get(conn, id)
@@ -413,7 +442,11 @@ mod tests {
         let updated = set_tags(
             &conn,
             &message.id,
-            &["  alpha ".to_string(), "alpha".to_string(), "beta".to_string()],
+            &[
+                "  alpha ".to_string(),
+                "alpha".to_string(),
+                "beta".to_string(),
+            ],
         )
         .unwrap();
         assert_eq!(updated.tags, vec!["alpha".to_string(), "beta".to_string()]);
@@ -497,7 +530,9 @@ mod tests {
         let conn = fresh_db("msg_empty");
         let (_, thread_id) = thread(&conn);
         assert_eq!(
-            append_user_turn(&conn, &thread_id, "   ", None).unwrap_err().code,
+            append_user_turn(&conn, &thread_id, "   ", None)
+                .unwrap_err()
+                .code,
             crate::domain::ErrorCode::VALIDATION
         );
     }

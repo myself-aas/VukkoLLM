@@ -181,7 +181,10 @@ impl<'a> ChatService<'a> {
         handle: &RequestHandle,
         chunk: &ProviderChunk,
     ) -> Result<Option<ChatMessage>, VukkoError> {
-        if self.status(&handle.request_id).is_some_and(RequestStatus::is_terminal) {
+        if self
+            .status(&handle.request_id)
+            .is_some_and(RequestStatus::is_terminal)
+        {
             // Late chunks never resurrect a finished or cancelled message.
             return Ok(None);
         }
@@ -219,7 +222,10 @@ impl<'a> ChatService<'a> {
 
         match result {
             Ok(completion) => {
-                if self.status(&handle.request_id).is_some_and(RequestStatus::is_terminal) {
+                if self
+                    .status(&handle.request_id)
+                    .is_some_and(RequestStatus::is_terminal)
+                {
                     return StreamOutcome {
                         completion: None,
                         error: None,
@@ -306,7 +312,8 @@ impl<'a> ChatService<'a> {
     }
 
     pub fn is_terminal(&self, request_id: &str) -> bool {
-        self.status(request_id).is_some_and(RequestStatus::is_terminal)
+        self.status(request_id)
+            .is_some_and(RequestStatus::is_terminal)
     }
 
     pub fn pending_count(&self) -> usize {
@@ -393,14 +400,19 @@ mod tests {
     fn send_persists_both_rows_before_any_token() {
         let (conn, thread_id) = service_setup();
         let service = ChatService::new(&conn);
-        let handle = service.send(&request(&thread_id, "What is sovereignty?")).expect("sent");
+        let handle = service
+            .send(&request(&thread_id, "What is sovereignty?"))
+            .expect("sent");
 
         let messages = message_repository::list(&conn, &thread_id).expect("list");
         assert_eq!(messages.len(), 2);
         assert_eq!(messages[0].content, "What is sovereignty?");
         assert_eq!(messages[1].id, handle.assistant_message_id);
         assert!(messages[1].is_streaming);
-        assert_eq!(service.status(&handle.request_id), Some(RequestStatus::Pending));
+        assert_eq!(
+            service.status(&handle.request_id),
+            Some(RequestStatus::Pending)
+        );
     }
 
     #[test]
@@ -408,9 +420,13 @@ mod tests {
         let (conn, thread_id) = service_setup();
         let service = ChatService::new(&conn);
 
-        let error = service.send(&request(&thread_id, "   ")).expect_err("empty");
+        let error = service
+            .send(&request(&thread_id, "   "))
+            .expect_err("empty");
         assert_eq!(error.code, ErrorCode::VALIDATION);
-        assert!(message_repository::list(&conn, &thread_id).expect("list").is_empty());
+        assert!(message_repository::list(&conn, &thread_id)
+            .expect("list")
+            .is_empty());
     }
 
     #[tokio::test]
@@ -432,7 +448,10 @@ mod tests {
             outcome.completion.as_ref().map(|c| c.text.as_str()),
             Some("Sovereignty is final authority.")
         );
-        assert_eq!(service.status(&handle.request_id), Some(RequestStatus::Completed));
+        assert_eq!(
+            service.status(&handle.request_id),
+            Some(RequestStatus::Completed)
+        );
 
         let messages = message_repository::list(&conn, &thread_id).expect("list");
         assert_eq!(messages[1].content, "Sovereignty is final authority.");
@@ -461,11 +480,21 @@ mod tests {
         let handle = service.send(&request(&thread_id, "hi")).expect("sent");
 
         let outcome = service
-            .stream(&handle, Arc::new(Failing) as Arc<dyn LlmProvider>, sample_request("m"))
+            .stream(
+                &handle,
+                Arc::new(Failing) as Arc<dyn LlmProvider>,
+                sample_request("m"),
+            )
             .await;
 
-        assert_eq!(outcome.error.as_ref().map(|error| error.code), Some(ErrorCode::NETWORK));
-        assert_eq!(service.status(&handle.request_id), Some(RequestStatus::Failed));
+        assert_eq!(
+            outcome.error.as_ref().map(|error| error.code),
+            Some(ErrorCode::NETWORK)
+        );
+        assert_eq!(
+            service.status(&handle.request_id),
+            Some(RequestStatus::Failed)
+        );
 
         let messages = message_repository::list(&conn, &thread_id).expect("list");
         assert_eq!(messages[1].content, "", "no invented text");
@@ -482,10 +511,18 @@ mod tests {
             .apply_chunk(&handle, &ProviderChunk::Text { text: "par".into() })
             .expect("first delta");
         service.cancel(&handle.request_id).expect("cancel");
-        assert_eq!(service.status(&handle.request_id), Some(RequestStatus::Cancelled));
+        assert_eq!(
+            service.status(&handle.request_id),
+            Some(RequestStatus::Cancelled)
+        );
 
         let late = service
-            .apply_chunk(&handle, &ProviderChunk::Text { text: "late".into() })
+            .apply_chunk(
+                &handle,
+                &ProviderChunk::Text {
+                    text: "late".into(),
+                },
+            )
             .expect("late chunks are dropped, not errors");
         assert!(late.is_none());
 
@@ -518,7 +555,12 @@ mod tests {
         let handle = service.send(&request(&thread_id, "hi")).expect("sent");
 
         service
-            .apply_chunk(&handle, &ProviderChunk::Reasoning { text: "thinking".into() })
+            .apply_chunk(
+                &handle,
+                &ProviderChunk::Reasoning {
+                    text: "thinking".into(),
+                },
+            )
             .expect("applied");
 
         let messages = message_repository::list(&conn, &thread_id).expect("list");

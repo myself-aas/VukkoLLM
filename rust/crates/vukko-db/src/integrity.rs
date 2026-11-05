@@ -28,7 +28,8 @@ pub struct IntegrityReport {
 
 /// Runs the checks. `ok` is true only when both SQLite checks pass.
 pub fn check(conn: &Connection) -> DbResult<IntegrityReport> {
-    let integrity_check: String = conn.pragma_query_value(None, "integrity_check", |row| row.get(0))?;
+    let integrity_check: String =
+        conn.pragma_query_value(None, "integrity_check", |row| row.get(0))?;
 
     let mut foreign_key_violations = 0u32;
     {
@@ -48,9 +49,10 @@ pub fn check(conn: &Connection) -> DbResult<IntegrityReport> {
             });
             continue;
         }
-        let rows: i64 = conn.query_row(&format!("SELECT COUNT(*) FROM \"{}\"", table), [], |row| {
-            row.get(0)
-        })?;
+        let rows: i64 =
+            conn.query_row(&format!("SELECT COUNT(*) FROM \"{}\"", table), [], |row| {
+                row.get(0)
+            })?;
         table_counts.push(TableCount {
             table: (*table).to_string(),
             rows: rows.max(0) as u32,
@@ -73,7 +75,11 @@ mod tests {
 
     fn temp_path(name: &str) -> PathBuf {
         let mut path = std::env::temp_dir();
-        path.push(format!("vukko-integrity-{}-{}.db", name, std::process::id()));
+        path.push(format!(
+            "vukko-integrity-{}-{}.db",
+            name,
+            std::process::id()
+        ));
         let _ = std::fs::remove_file(&path);
         path
     }

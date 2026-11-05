@@ -7,7 +7,7 @@
 
 use crate::domain::{Citation, ErrorCode, ProviderError};
 
-use super::{ProviderChunk, Protocol};
+use super::{Protocol, ProviderChunk};
 
 /// Result of parsing a body: the chunks in order, and the first fatal error.
 #[derive(Debug, Clone, PartialEq, Default)]
@@ -76,7 +76,9 @@ fn parse_openai(raw: &str) -> ParsedStream {
             .and_then(|content| content.as_str())
         {
             if !text.is_empty() {
-                parsed.chunks.push(ProviderChunk::Text { text: text.to_string() });
+                parsed.chunks.push(ProviderChunk::Text {
+                    text: text.to_string(),
+                });
             }
         }
         if let Some(reasoning) = delta
@@ -111,12 +113,20 @@ fn parse_openai(raw: &str) -> ParsedStream {
             }
         }
         if let Some(usage) = frame.get("usage") {
-            let input_tokens = usage.get("prompt_tokens").and_then(|value| value.as_u64()).unwrap_or(0);
+            let input_tokens = usage
+                .get("prompt_tokens")
+                .and_then(|value| value.as_u64())
+                .unwrap_or(0);
             let output_tokens = usage
                 .get("completion_tokens")
                 .and_then(|value| value.as_u64())
                 .unwrap_or(0);
-            if output_tokens > 0 || !parsed.chunks.iter().any(|chunk| matches!(chunk, ProviderChunk::Usage { .. })) {
+            if output_tokens > 0
+                || !parsed
+                    .chunks
+                    .iter()
+                    .any(|chunk| matches!(chunk, ProviderChunk::Usage { .. }))
+            {
                 parsed.chunks.push(ProviderChunk::Usage {
                     input_tokens: input_tokens as u32,
                     output_tokens: output_tokens as u32,
@@ -151,7 +161,11 @@ fn parse_anthropic(raw: &str) -> ParsedStream {
             continue;
         };
 
-        match frame.get("type").and_then(|value| value.as_str()).unwrap_or_default() {
+        match frame
+            .get("type")
+            .and_then(|value| value.as_str())
+            .unwrap_or_default()
+        {
             "message_start" => {
                 input_tokens = frame
                     .get("message")
@@ -162,11 +176,16 @@ fn parse_anthropic(raw: &str) -> ParsedStream {
             }
             "content_block_start" => {
                 let block = frame.get("content_block");
-                if block.and_then(|block| block.get("type")).and_then(|value| value.as_str())
+                if block
+                    .and_then(|block| block.get("type"))
+                    .and_then(|value| value.as_str())
                     == Some("tool_use")
                 {
                     tool = Some((
-                        frame.get("index").and_then(|value| value.as_u64()).unwrap_or(0),
+                        frame
+                            .get("index")
+                            .and_then(|value| value.as_u64())
+                            .unwrap_or(0),
                         block
                             .and_then(|block| block.get("name"))
                             .and_then(|value| value.as_str())
@@ -188,7 +207,9 @@ fn parse_anthropic(raw: &str) -> ParsedStream {
                             .and_then(|delta| delta.get("text"))
                             .and_then(|value| value.as_str())
                         {
-                            parsed.chunks.push(ProviderChunk::Text { text: text.to_string() });
+                            parsed.chunks.push(ProviderChunk::Text {
+                                text: text.to_string(),
+                            });
                         }
                     }
                     "thinking_delta" => {
@@ -215,11 +236,21 @@ fn parse_anthropic(raw: &str) -> ParsedStream {
                 }
             }
             "content_block_stop" => {
-                let index = frame.get("index").and_then(|value| value.as_u64()).unwrap_or(0);
+                let index = frame
+                    .get("index")
+                    .and_then(|value| value.as_u64())
+                    .unwrap_or(0);
                 if let Some((tool_index, name, buffer)) = tool.take() {
                     if tool_index == index {
-                        let input = if buffer.is_empty() { "{}".to_string() } else { buffer };
-                        parsed.chunks.push(ProviderChunk::ToolCall { tool_name: name, input });
+                        let input = if buffer.is_empty() {
+                            "{}".to_string()
+                        } else {
+                            buffer
+                        };
+                        parsed.chunks.push(ProviderChunk::ToolCall {
+                            tool_name: name,
+                            input,
+                        });
                     }
                 }
             }
@@ -250,12 +281,12 @@ fn parse_anthropic(raw: &str) -> ParsedStream {
                     .and_then(|error| error.get("type"))
                     .and_then(|value| value.as_str())
                     .unwrap_or("unknown");
-                let code = if error_type.contains("authentication") || error_type.contains("permission")
-                {
-                    ErrorCode::AUTHENTICATION
-                } else {
-                    ErrorCode::NETWORK
-                };
+                let code =
+                    if error_type.contains("authentication") || error_type.contains("permission") {
+                        ErrorCode::AUTHENTICATION
+                    } else {
+                        ErrorCode::NETWORK
+                    };
                 parsed.error.get_or_insert(ProviderError {
                     code,
                     message: message.to_string(),
@@ -270,8 +301,15 @@ fn parse_anthropic(raw: &str) -> ParsedStream {
     if let Some((_, name, buffer)) = tool.take() {
         // The recorded stream can end right after the last fragment; flushing
         // here keeps the tool call instead of dropping it.
-        let input = if buffer.is_empty() { "{}".to_string() } else { buffer };
-        parsed.chunks.push(ProviderChunk::ToolCall { tool_name: name, input });
+        let input = if buffer.is_empty() {
+            "{}".to_string()
+        } else {
+            buffer
+        };
+        parsed.chunks.push(ProviderChunk::ToolCall {
+            tool_name: name,
+            input,
+        });
     }
     if input_tokens > 0 || output_tokens > 0 {
         parsed.chunks.push(ProviderChunk::Usage {
@@ -280,7 +318,9 @@ fn parse_anthropic(raw: &str) -> ParsedStream {
         });
     }
     if let Some(reason) = stop_reason {
-        parsed.chunks.push(ProviderChunk::Done { finish_reason: reason });
+        parsed.chunks.push(ProviderChunk::Done {
+            finish_reason: reason,
+        });
     }
     parsed
 }
@@ -315,7 +355,9 @@ fn parse_gemini(raw: &str) -> ParsedStream {
             continue;
         };
 
-        let candidate = frame.get("candidates").and_then(|candidates| candidates.get(0));
+        let candidate = frame
+            .get("candidates")
+            .and_then(|candidates| candidates.get(0));
         if let Some(parts) = candidate
             .and_then(|candidate| candidate.get("content"))
             .and_then(|content| content.get("parts"))
@@ -333,9 +375,13 @@ fn parse_gemini(raw: &str) -> ParsedStream {
                     .and_then(|value| value.as_bool())
                     .unwrap_or(false);
                 parsed.chunks.push(if is_thought {
-                    ProviderChunk::Reasoning { text: text.to_string() }
+                    ProviderChunk::Reasoning {
+                        text: text.to_string(),
+                    }
                 } else {
-                    ProviderChunk::Text { text: text.to_string() }
+                    ProviderChunk::Text {
+                        text: text.to_string(),
+                    }
                 });
             }
         }
@@ -363,7 +409,9 @@ fn parse_gemini(raw: &str) -> ParsedStream {
 
     if let Some(reason) = pending_finish {
         // `done` is emitted once, after usage, so the UI closes the stream last.
-        parsed.chunks.push(ProviderChunk::Done { finish_reason: reason });
+        parsed.chunks.push(ProviderChunk::Done {
+            finish_reason: reason,
+        });
     }
     parsed
 }
@@ -376,13 +424,20 @@ fn parse_ollama(raw: &str) -> ParsedStream {
             continue;
         };
         if let Some(error) = frame.get("error").and_then(|value| value.as_str()) {
-            parsed.error.get_or_insert_with(|| ProviderError::network(error, false));
+            parsed
+                .error
+                .get_or_insert_with(|| ProviderError::network(error, false));
             continue;
         }
         let message = frame.get("message");
-        if let Some(text) = message.and_then(|message| message.get("content")).and_then(|value| value.as_str()) {
+        if let Some(text) = message
+            .and_then(|message| message.get("content"))
+            .and_then(|value| value.as_str())
+        {
             if !text.is_empty() {
-                parsed.chunks.push(ProviderChunk::Text { text: text.to_string() });
+                parsed.chunks.push(ProviderChunk::Text {
+                    text: text.to_string(),
+                });
             }
         }
         if let Some(thinking) = message
@@ -390,18 +445,26 @@ fn parse_ollama(raw: &str) -> ParsedStream {
             .and_then(|value| value.as_str())
         {
             if !thinking.is_empty() {
-                parsed.chunks.push(ProviderChunk::Reasoning { text: thinking.to_string() });
+                parsed.chunks.push(ProviderChunk::Reasoning {
+                    text: thinking.to_string(),
+                });
             }
         }
-        if frame.get("done").and_then(|value| value.as_bool()).unwrap_or(false) {
+        if frame
+            .get("done")
+            .and_then(|value| value.as_bool())
+            .unwrap_or(false)
+        {
             if frame.get("prompt_eval_count").is_some() || frame.get("eval_count").is_some() {
                 parsed.chunks.push(ProviderChunk::Usage {
                     input_tokens: frame
                         .get("prompt_eval_count")
                         .and_then(|value| value.as_u64())
                         .unwrap_or(0) as u32,
-                    output_tokens: frame.get("eval_count").and_then(|value| value.as_u64()).unwrap_or(0)
-                        as u32,
+                    output_tokens: frame
+                        .get("eval_count")
+                        .and_then(|value| value.as_u64())
+                        .unwrap_or(0) as u32,
                 });
             }
             parsed.chunks.push(ProviderChunk::Done {
@@ -423,15 +486,23 @@ fn parse_instance(raw: &str) -> ParsedStream {
             parsed.error.get_or_insert_with(|| malformed(&payload));
             continue;
         };
-        match frame.get("type").and_then(|value| value.as_str()).unwrap_or_default() {
+        match frame
+            .get("type")
+            .and_then(|value| value.as_str())
+            .unwrap_or_default()
+        {
             "delta" => {
                 if let Some(text) = frame.get("text").and_then(|value| value.as_str()) {
-                    parsed.chunks.push(ProviderChunk::Text { text: text.to_string() });
+                    parsed.chunks.push(ProviderChunk::Text {
+                        text: text.to_string(),
+                    });
                 }
             }
             "reasoning" => {
                 if let Some(text) = frame.get("text").and_then(|value| value.as_str()) {
-                    parsed.chunks.push(ProviderChunk::Reasoning { text: text.to_string() });
+                    parsed.chunks.push(ProviderChunk::Reasoning {
+                        text: text.to_string(),
+                    });
                 }
             }
             "citation" => {
@@ -462,10 +533,14 @@ fn parse_instance(raw: &str) -> ParsedStream {
             "done" => {
                 if let Some(usage) = frame.get("usage") {
                     parsed.chunks.push(ProviderChunk::Usage {
-                        input_tokens: usage.get("input").and_then(|value| value.as_u64()).unwrap_or(0)
-                            as u32,
-                        output_tokens: usage.get("output").and_then(|value| value.as_u64()).unwrap_or(0)
-                            as u32,
+                        input_tokens: usage
+                            .get("input")
+                            .and_then(|value| value.as_u64())
+                            .unwrap_or(0) as u32,
+                        output_tokens: usage
+                            .get("output")
+                            .and_then(|value| value.as_u64())
+                            .unwrap_or(0) as u32,
                     });
                 }
                 parsed.chunks.push(ProviderChunk::Done {
@@ -521,14 +596,23 @@ mod tests {
         assert_eq!(
             parsed.chunks,
             vec![
-                ProviderChunk::Text { text: "Hello".into() },
-                ProviderChunk::Text { text: " there".into() },
+                ProviderChunk::Text {
+                    text: "Hello".into()
+                },
+                ProviderChunk::Text {
+                    text: " there".into()
+                },
                 ProviderChunk::ToolCall {
                     tool_name: "DocumentRAG".into(),
                     input: "{\"query\":\"sovereignty\"}".into()
                 },
-                ProviderChunk::Usage { input_tokens: 42, output_tokens: 11 },
-                ProviderChunk::Done { finish_reason: "tool_calls".into() },
+                ProviderChunk::Usage {
+                    input_tokens: 42,
+                    output_tokens: 11
+                },
+                ProviderChunk::Done {
+                    finish_reason: "tool_calls".into()
+                },
             ]
         );
     }
@@ -544,9 +628,15 @@ mod tests {
         assert_eq!(
             parsed.chunks,
             vec![
-                ProviderChunk::Reasoning { text: "Let me think".into() },
-                ProviderChunk::Text { text: "Answer.".into() },
-                ProviderChunk::Done { finish_reason: "stop".into() },
+                ProviderChunk::Reasoning {
+                    text: "Let me think".into()
+                },
+                ProviderChunk::Text {
+                    text: "Answer.".into()
+                },
+                ProviderChunk::Done {
+                    finish_reason: "stop".into()
+                },
             ]
         );
     }
@@ -568,9 +658,14 @@ mod tests {
         }));
         assert_eq!(
             parsed.chunks.last(),
-            Some(&ProviderChunk::Done { finish_reason: "end_turn".into() })
+            Some(&ProviderChunk::Done {
+                finish_reason: "end_turn".into()
+            })
         );
-        assert!(parsed.chunks.contains(&ProviderChunk::Usage { input_tokens: 25, output_tokens: 64 }));
+        assert!(parsed.chunks.contains(&ProviderChunk::Usage {
+            input_tokens: 25,
+            output_tokens: 64
+        }));
     }
 
     #[test]
@@ -582,9 +677,15 @@ mod tests {
         assert_eq!(
             parsed.chunks,
             vec![
-                ProviderChunk::Reasoning { text: "Weighing options.".into() },
-                ProviderChunk::Text { text: "Final answer.".into() },
-                ProviderChunk::Done { finish_reason: "STOP".into() },
+                ProviderChunk::Reasoning {
+                    text: "Weighing options.".into()
+                },
+                ProviderChunk::Text {
+                    text: "Final answer.".into()
+                },
+                ProviderChunk::Done {
+                    finish_reason: "STOP".into()
+                },
             ]
         );
     }
@@ -602,8 +703,13 @@ mod tests {
             vec![
                 ProviderChunk::Text { text: "Loc".into() },
                 ProviderChunk::Text { text: "al".into() },
-                ProviderChunk::Usage { input_tokens: 9, output_tokens: 2 },
-                ProviderChunk::Done { finish_reason: "stop".into() },
+                ProviderChunk::Usage {
+                    input_tokens: 9,
+                    output_tokens: 2
+                },
+                ProviderChunk::Done {
+                    finish_reason: "stop".into()
+                },
             ]
         );
     }
@@ -616,17 +722,22 @@ mod tests {
             "{\"type\":\"done\",\"finishReason\":\"stop\",\"usage\":{\"input\":30,\"output\":8}}\n",
         );
         let parsed = parse_stream(Protocol::InstanceNdjson, raw);
-        assert!(matches!(
-            parsed.chunks[1],
-            ProviderChunk::Citation { .. }
-        ));
-        assert_eq!(parsed.chunks.last(), Some(&ProviderChunk::Done { finish_reason: "stop".into() }));
+        assert!(matches!(parsed.chunks[1], ProviderChunk::Citation { .. }));
+        assert_eq!(
+            parsed.chunks.last(),
+            Some(&ProviderChunk::Done {
+                finish_reason: "stop".into()
+            })
+        );
     }
 
     #[test]
     fn malformed_payloads_become_errors_not_silence() {
         let parsed = parse_stream(Protocol::OpenAiSse, "data: {\"choices\":[{");
-        assert_eq!(parsed.error.map(|error| error.code), Some(ErrorCode::NETWORK));
+        assert_eq!(
+            parsed.error.map(|error| error.code),
+            Some(ErrorCode::NETWORK)
+        );
     }
 
     #[test]
