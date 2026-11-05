@@ -250,15 +250,31 @@ describe('the packaging contract', () => {
     }
   });
 
-  test('clippy denies warnings and allows its optional advice back', () => {
-    // `-D warnings` denies everything, including the pedantic warnings the
-    // crates opt into with `#![warn(clippy::pedantic)]`. The `-A` afterwards is
-    // what keeps that attribute from turning style advice into build failures,
-    // and the order matters: rustc applies the last matching flag.
+  test('clippy denies warnings without denying its optional advice', () => {
+    // `-D warnings` denies everything, so pedantic has to be allowed somewhere.
+    // It must be a crate attribute: a command-line `-A` cannot override the
+    // `#![warn(clippy::pedantic)]` that the crates carried, which is precisely
+    // why the flag-based attempt did not work.
     const clippy = /cargo clippy[^\n]*/.exec(read('.github/workflows/rust.yml'))?.[0] ?? '';
     expect(clippy).toContain('-D warnings');
-    expect(clippy).toContain('-A clippy::pedantic');
-    expect(clippy.indexOf('-D warnings')).toBeLessThan(clippy.indexOf('-A clippy::pedantic'));
+
+    for (const crate of ['vukko-core', 'vukko-db', 'vukko-bridge']) {
+      const lib = read(`rust/crates/${crate}/src/lib.rs`);
+      expect(lib).toContain('#![allow(clippy::pedantic)]');
+      // An `#![warn(clippy::pedantic)]` here would put the two attributes back
+      // in conflict, and `-D warnings` would win.
+      expect(lib).not.toContain('#![warn(clippy::pedantic)]');
+    }
+  });
+
+  test('unwrap stays denied in production and allowed in tests', () => {
+    // The intent was always "no unwrap in shipped code". A blanket deny also hit
+    // test bodies, where unwrapping a known-good fixture is the point.
+    for (const crate of ['vukko-core', 'vukko-db', 'vukko-bridge']) {
+      const lib = read(`rust/crates/${crate}/src/lib.rs`);
+      expect(lib).toContain('#![cfg_attr(not(test), deny(clippy::unwrap_used))]');
+      expect(lib).not.toMatch(/#!\[deny\(clippy::unwrap_used\)\]/);
+    }
   });
 
   test('the packaging guide names every target the plan requires', () => {

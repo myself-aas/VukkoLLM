@@ -84,16 +84,14 @@ jobs:
 
       # Warnings are errors: a warning that survives a PR becomes permanent.
       #
-      # `-D warnings` denies *every* warning, which includes the pedantic ones
-      # the crates opt into with `#![warn(clippy::pedantic)]` — so the attribute
-      # and the gate contradict each other unless pedantic is allowed back
-      # afterwards. Without the `-A`, doc-backtick style, `# Errors` sections and
-      # function length become build failures, which is not what a correctness
-      # gate is for. Pedantic stays visible as a warning; everything in the
-      # default groups still fails the build. tests/ci pins both halves of this.
+      # The crate-level `#![allow(clippy::pedantic)]` is what keeps pedantic
+      # advice out of this, and it has to be a source attribute: a command-line
+      # `-A` cannot override `#![warn(...)]` in the crate, so the two would
+      # contradict each other and doc-backtick style would become a build error.
+      # `unwrap_used` is denied only for non-test code, by the same policy.
       - name: Clippy
         working-directory: rust
-        run: cargo clippy --all-targets --all-features -- -D warnings -A clippy::pedantic
+        run: cargo clippy --all-targets --all-features -- -D warnings
 
       - name: Tests
         working-directory: rust

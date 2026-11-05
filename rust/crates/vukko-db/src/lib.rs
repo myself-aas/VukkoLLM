@@ -9,8 +9,14 @@
 //! - [`integrity`] — health checks the storage inspector shows the user;
 //! - [`schema`] — the column contract, used by validation and tests.
 
-#![deny(clippy::unwrap_used)]
-#![warn(clippy::pedantic)]
+// Pedantic is advisory: it is here so the suggestions show up in review, not so
+// they fail a build. The gate runs `-D warnings`; without this `allow` the two
+// attributes contradict each other and doc-backtick style becomes a hard error.
+#![allow(clippy::pedantic)]
+// `unwrap_used` is denied on purpose — but a test asserting on a known-good
+// fixture is exactly where panicking is the intended behaviour, so the denial
+// is scoped to production code instead of being weakened for the whole crate.
+#![cfg_attr(not(test), deny(clippy::unwrap_used))]
 #![allow(clippy::module_name_repetitions)]
 
 pub mod error;

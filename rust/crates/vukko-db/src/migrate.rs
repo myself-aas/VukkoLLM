@@ -338,7 +338,7 @@ pub fn adopt(path: &Path) -> DbResult<(Connection, AdoptionReport)> {
     for migration in &pending {
         if let Err(error) = apply(&mut conn, migration) {
             drop(conn);
-            let restored = restore(&path, &backup_path);
+            let restored = restore(path, &backup_path);
             let _ = fs::remove_file(&state_path);
             return Err(DbError::Migration {
                 version: migration.version,
@@ -350,7 +350,7 @@ pub fn adopt(path: &Path) -> DbResult<(Connection, AdoptionReport)> {
 
     if let Err(error) = validate(&conn, &before) {
         drop(conn);
-        let restored = restore(&path, &backup_path);
+        let restored = restore(path, &backup_path);
         let _ = fs::remove_file(&state_path);
         return Err(match error {
             DbError::Validation { message, .. } => DbError::Validation { message, restored },
