@@ -14,7 +14,7 @@ Architecture) + Rust, executed from [MIGRATION_PLAN.md](MIGRATION_PLAN.md).
 | 3 Room → Rust SQLite | done | `rust/crates/vukko-db/`, `tests/migration` |
 | 4 Repository and ViewModel port | done | `rust/crates/vukko-core/src/{repository,services}`, `rust/crates/vukko-bridge/`, `tests/repository` |
 | 5 Providers, streaming, cancellation | done | `src/services/providers/`, `src/services/chatService.ts`, `rust/crates/vukko-core/src/providers/`, `rust/crates/vukko-core/src/services/chat.rs` |
-| 6 UI port | done for the chat surface | `src/theme/`, `src/components/`, `src/screens/ChatScreen/`, `tests/ui` |
+| 6 UI port | done for the chat surface; workspace/instance dialogs are not ported | `src/theme/`, `src/components/`, `src/screens/ChatScreen/`, `tests/ui` |
 | 7 Native integrations | done as adapters | `src/native/integrations.ts`, `rust/crates/vukko-core/src/services/{files,backup}.rs`, `tests/native` |
 | 8 Rust build and packaging | documented and pinned | `rust/README.md`, `rust/rust-toolchain.toml` |
 | 9 Testing strategy | done | `tests/`, `tests/e2e/lifecycle.test.js` |
@@ -25,7 +25,7 @@ Architecture) + Rust, executed from [MIGRATION_PLAN.md](MIGRATION_PLAN.md).
 
 This migration was authored in an environment with **no Rust toolchain, no JDK
 and no Android SDK**. `npm test`, `npx tsc --noEmit`, ESLint and Prettier are
-green here (410 tests in 21 suites); Rust is syntax-checked with tree-sitter and compiled for
+green here; Rust is syntax-checked with tree-sitter and compiled for
 the first time in CI, where no step is allowed to fail quietly.
 [docs/RUST_VERIFICATION.md](docs/RUST_VERIFICATION.md) is the full account, and
 `.superpowers/sdd/MIGRATION_PLAN/progress.md` records every decision with its

@@ -194,4 +194,39 @@ describe('the README tells the truth about what is done', () => {
     expect(text).toMatch(/no Rust toolchain/);
     expect(text).toMatch(/RUST_VERIFICATION/);
   });
+
+  test('every replacement path the feature matrix claims exists', () => {
+    const matrix = read('docs/FEATURE_MATRIX.md');
+    const rows = matrix.split('\n').filter((line) => /^\| \d+ /.test(line));
+    expect(rows.length).toBeGreaterThanOrEqual(30);
+
+    const expand = (entry) => {
+      const brace = /^(.*)\{([^}]+)\}(.*)$/.exec(entry);
+      if (!brace) return [entry];
+      return brace[2].split(',').map((part) => `${brace[1]}${part.trim()}${brace[3]}`);
+    };
+
+    const missing = [];
+    for (const line of rows) {
+      const cells = line.split('|').map((cell) => cell.trim());
+      // | # | surface | current | replacement | status | → replacement is cells[4].
+      for (const match of (cells[4] ?? '').matchAll(/`([^`]+)`/g)) {
+        // Only paths in this repository are checkable; prose and Kotlin
+        // locations are left to the baseline tests.
+        // `src/theme/*` and `tests/**` name directories: check the directory,
+        // since a glob that matches nothing is exactly the failure to catch.
+        const entry = match[1]
+          .split(' ')[0]
+          .replace(/\/\*+$/, '')
+          .replace(/\/$/, '');
+        if (!/^(src|rust|tests)\//.test(entry)) continue;
+        for (const candidate of expand(entry)) {
+          if (!existsSync(join(ROOT, candidate))) {
+            missing.push(`${cells[1]}: ${candidate}`);
+          }
+        }
+      }
+    }
+    expect(missing).toEqual([]);
+  });
 });

@@ -7,6 +7,8 @@ export interface SettingsProps {
   visible: boolean;
   biometricLockEnabled?: boolean;
   onToggleBiometricLock?: (enabled: boolean) => void;
+  /** Why the switch snapped back, e.g. a device with no enrolled biometrics. */
+  biometricLockError?: string | null;
   onOpenStorage: () => void;
   onOpenGitHub: () => void;
   onClose: () => void;
@@ -22,6 +24,7 @@ export function Settings({
   visible,
   biometricLockEnabled = false,
   onToggleBiometricLock,
+  biometricLockError,
   onOpenStorage,
   onOpenGitHub,
   onClose,
@@ -46,6 +49,7 @@ export function Settings({
               onValueChange={(enabled) => onToggleBiometricLock?.(enabled)}
             />
           </View>
+          {biometricLockError ? <Text style={styles.rowError}>{biometricLockError}</Text> : null}
 
           <Pressable
             accessibilityRole="button"
@@ -97,6 +101,7 @@ const styles = StyleSheet.create({
   rowText: { flex: 1, gap: 2 },
   rowLabel: { ...typography.bodyMedium, color: colors.textPrimary },
   rowHint: { ...typography.bodySmall, color: colors.textSecondary },
+  rowError: { ...typography.bodySmall, color: colors.error, paddingHorizontal: spacing.md },
   close: {
     ...typography.title,
     color: colors.textSecondary,

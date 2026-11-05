@@ -12,9 +12,13 @@ import { Settings } from '../../components/Settings';
 import { StorageInspector } from '../../components/StorageInspector';
 import { TopBar } from '../../components/TopBar';
 import { WorkspaceDrawer } from '../../components/WorkspaceDrawer';
+import type { AppLock } from '../../app/session';
 import type { ChatService } from '../../services/chatService';
 import type { NativeEvent } from '../../types/native';
-import { colors } from '../../theme';
+import { DEFAULT_MODELS } from '../../types/provider';
+import type { IntegrityCheckResult, SovereignStorageStats } from '../../types/storage';
+import type { ErrorCode, VukkoError } from '../../types/errors';
+import { colors, spacing, typography } from '../../theme';
 import { useChatStore } from './chatStore';
 
 export interface ChatScreenProps {
@@ -28,6 +32,21 @@ export interface ChatScreenProps {
     messages: import('../../types/chat').ChatMessage[];
   }>;
   onExport: (format: import('../../types/export').ExportFormat, threadId: string) => Promise<void>;
+  /** `getStorageStats()` on the bridge. Injected like every other native call. */
+  loadStorageStats: () => Promise<SovereignStorageStats>;
+  /** `runIntegrityCheck()` on the bridge. */
+  runIntegrityCheck: () => Promise<IntegrityCheckResult>;
+  /**
+   * Which providers still need an API key. Optional because the host reads it
+   * from secure storage, which tests and preview builds do not have; absent, the
+   * picker says nothing rather than guessing.
+   */
+  loadProvidersNeedingKeys?: () => Promise<import('../../types/provider').ProviderType[]>;
+  /**
+   * The app lock. Optional: without it the Settings switch is not rendered at
+   * all, because a toggle that stores a preference nothing reads is a lie.
+   */
+  appLock?: AppLock;
 }
 
 /**
@@ -43,6 +62,10 @@ export function ChatScreen({
   loadWorkspaces,
   loadWorkspace,
   onExport,
+  loadStorageStats,
+  runIntegrityCheck,
+  loadProvidersNeedingKeys,
+  appLock,
 }: ChatScreenProps): React.JSX.Element {
   const store = useChatStore();
   const [drawerOpen, setDrawerOpen] = useState(false);
@@ -51,6 +74,21 @@ export function ChatScreen({
   const [githubOpen, setGithubOpen] = useState(false);
   const [storageOpen, setStorageOpen] = useState(false);
   const [exportOpen, setExportOpen] = useState(false);
+  // The inspector shows measured values only: a failed read is a visible error,
+  // never a grid of zeros that looks like an empty database.
+  const [storage, setStorage] = useState<{
+    stats: SovereignStorageStats | null;
+    integrity: IntegrityCheckResult | null;
+    error: VukkoError | null;
+  }>({ stats: null, integrity: null, error: null });
+  // The prompt of the request that failed. Retry resends *this*, never the
+  // composer draft: the composer clears on send, so a draft-based retry would
+  // send an empty string.
+  const [failedPrompt, setFailedPrompt] = useState<string | null>(null);
+  const [biometricLock, setBiometricLock] = useState<{
+    enabled: boolean;
+    error: string | null;
+  }>({ enabled: false, error: null });
 
   const openWorkspace = async (workspaceId: string) => {
     const next = store.workspaces.find((candidate) => candidate.id === workspaceId);
@@ -63,6 +101,46 @@ export function ChatScreen({
     const result = await loadWorkspace(workspaceId);
     store.setThreads(result.threads);
     store.setMessages(result.messages);
+  };
+
+  const toggleBiometricLock = async (enabled: boolean) => {
+    if (!appLock) return;
+    try {
+      await appLock.setEnabled(enabled);
+      setBiometricLock({ enabled, error: null });
+    } catch (cause) {
+      // A device with no enrolled biometrics refuses the lock. Report it and
+      // leave the switch off rather than showing an enabled lock that cannot
+      // ever be opened.
+      setBiometricLock({
+        enabled: false,
+        error: cause instanceof Error ? cause.message : 'The app lock is unavailable',
+      });
+    }
+  };
+
+  const openStorage = async () => {
+    setSettingsOpen(false);
+    setStorageOpen(true);
+    setStorage({ stats: null, integrity: null, error: null });
+    try {
+      const [stats, integrity] = await Promise.all([loadStorageStats(), runIntegrityCheck()]);
+      setStorage({ stats, integrity, error: null });
+    } catch (cause) {
+      // Both reads are storage reads: a code the bridge already chose is kept,
+      // anything else (a programming error, a missing module) is reported as a
+      // storage failure rather than dressed up as something specific.
+      const code = (cause as { code?: ErrorCode }).code;
+      setStorage({
+        stats: null,
+        integrity: null,
+        error: {
+          code: code === 'NOT_INITIALIZED' || code === 'STORAGE' ? code : 'STORAGE',
+          message: cause instanceof Error ? cause.message : 'Storage could not be read',
+          retryable: true,
+        },
+      });
+    }
   };
 
   const openFirstWorkspace = React.useCallback(async () => {
@@ -84,6 +162,24 @@ export function ChatScreen({
     void openFirstWorkspace();
   }, [openFirstWorkspace]);
 
+  // Provider readiness is a property of secure storage, not of the screen: it
+  // is read once on mount and only if the host supplies the reader.
+  React.useEffect(() => {
+    if (!appLock) return;
+    void appLock.isEnabled().then(
+      (enabled) => setBiometricLock({ enabled, error: null }),
+      () => setBiometricLock({ enabled: false, error: null }),
+    );
+  }, [appLock]);
+
+  React.useEffect(() => {
+    if (!loadProvidersNeedingKeys) return;
+    void loadProvidersNeedingKeys().then(
+      (providers) => useChatStore.getState().setProvidersNeedingKeys(providers),
+      () => useChatStore.getState().setProvidersNeedingKeys([]),
+    );
+  }, [loadProvidersNeedingKeys]);
+
   function onEvent(event: NativeEvent) {
     switch (event.type) {
       case 'message.delta':
@@ -92,9 +188,21 @@ export function ChatScreen({
       case 'message.completed':
         useChatStore.getState().complete(event.requestId, event.message);
         break;
-      case 'message.failed':
+      case 'message.failed': {
+        // Capture the prompt before the store clears the request: after `fail`
+        // the transcript no longer identifies which turn failed.
+        const state = useChatStore.getState();
+        const failed = state.messages.find(
+          (message) => message.isStreaming && message.sender === 'ASSISTANT',
+        );
+        if (failed) {
+          const turnIndex = state.messages.indexOf(failed) - 1;
+          const turn = state.messages[turnIndex];
+          if (turn?.sender === 'USER') setFailedPrompt(turn.content);
+        }
         useChatStore.getState().fail(event.requestId, event.error);
         break;
+      }
       default:
         break;
     }
@@ -102,27 +210,42 @@ export function ChatScreen({
 
   const send = async (prompt: string) => {
     const workspace = store.workspace;
+    const requestPrompt = prompt.trim();
     const model = store.selectedModel;
     if (!workspace) return;
+    if (!model) {
+      // Never guess a provider: sending as "GEMINI by default" is how a key the
+      // user never configured gets used, or a local-only workspace leaves the
+      // device. The host loads the persisted model before this screen sends.
+      useChatStore.getState().reportError({
+        code: 'NOT_FOUND',
+        message: 'Choose a model before sending',
+        retryable: false,
+      });
+      return;
+    }
 
     let state;
     try {
       state = await chatService.send({
         threadId: store.activeThreadId ?? '',
-        content: prompt,
-        provider: model?.provider ?? 'GEMINI',
-        modelId: model?.id ?? 'gemini-2.5-flash',
+        content: requestPrompt,
+        provider: model.provider,
+        modelId: model.id,
       });
     } catch (cause) {
       // A send that fails before streaming (an empty prompt, a storage error)
       // still has to tell the user; swallowing it would leave a blank screen.
+      const code = (cause as { code?: ErrorCode }).code;
+      setFailedPrompt(null);
       useChatStore.getState().reportError({
-        code: (cause as { code?: string }).code === 'VALIDATION' ? 'VALIDATION' : 'STORAGE',
+        code: code === 'VALIDATION' ? 'VALIDATION' : 'STORAGE',
         message: cause instanceof Error ? cause.message : 'The message could not be sent',
         retryable: false,
       });
       return;
     }
+    setFailedPrompt(null);
 
     // The service allocates and persists both rows, so the transcript must
     // render *those* ids: a locally invented id would receive no deltas.
@@ -149,7 +272,7 @@ export function ChatScreen({
         id: `msg_local_user_${state.requestId}`,
         threadId: state.threadId,
         sender: 'USER',
-        content: prompt,
+        content: requestPrompt,
         isStreaming: false,
       },
       {
@@ -173,7 +296,19 @@ export function ChatScreen({
         onOpenModelPicker={() => setPickerOpen(true)}
       />
 
-      {store.error ? <ErrorState error={store.error} onRetry={() => send(store.draft)} /> : null}
+      {store.error ? (
+        <ErrorState
+          error={store.error}
+          onRetry={
+            failedPrompt === null
+              ? undefined
+              : () => {
+                  useChatStore.getState().clearError();
+                  void send(failedPrompt);
+                }
+          }
+        />
+      ) : null}
 
       <FlatList
         data={store.messages}
@@ -221,7 +356,7 @@ export function ChatScreen({
 
       <ModelPicker
         visible={pickerOpen}
-        models={store.selectedModel ? [store.selectedModel] : []}
+        models={[...DEFAULT_MODELS]}
         needsApiKey={(provider) => store.providersNeedingKeys.includes(provider)}
         selectedModelId={store.selectedModel?.id ?? ''}
         onSelect={(model) => {
@@ -233,10 +368,10 @@ export function ChatScreen({
 
       <Settings
         visible={settingsOpen}
-        onOpenStorage={() => {
-          setSettingsOpen(false);
-          setStorageOpen(true);
-        }}
+        biometricLockEnabled={appLock ? biometricLock.enabled : undefined}
+        biometricLockError={biometricLock.error}
+        onToggleBiometricLock={appLock ? (enabled) => void toggleBiometricLock(enabled) : undefined}
+        onOpenStorage={() => void openStorage()}
         onOpenGitHub={() => {
           setSettingsOpen(false);
           setGithubOpen(true);
@@ -254,18 +389,13 @@ export function ChatScreen({
           onRequestClose={() => setStorageOpen(false)}
         >
           <View style={styles.modalBackdrop}>
-            <StorageInspector
-              stats={{
-                databaseName: 'vukko.db',
-                totalWorkspaces: store.workspaces.length,
-                totalThreads: store.threads.length,
-                totalMessages: store.messages.length,
-                totalDocuments: 0,
-                isLocalEncrypted: true,
-                storageType: 'SQLite (Rust)',
-                dataSovereigntyStatus: 'Local only',
-              }}
-            />
+            {storage.stats ? (
+              <StorageInspector stats={storage.stats} integrity={storage.integrity} />
+            ) : storage.error ? (
+              <ErrorState error={storage.error} onRetry={() => void openStorage()} />
+            ) : (
+              <Text style={styles.modalLoading}>Reading storage…</Text>
+            )}
             <Pressable
               accessibilityRole="button"
               accessibilityLabel="Close storage inspector"
@@ -291,6 +421,12 @@ export function ChatScreen({
 
 const styles = StyleSheet.create({
   screen: { flex: 1, backgroundColor: colors.background },
+  modalLoading: {
+    ...typography.bodyMedium,
+    color: colors.textSecondary,
+    textAlign: 'center',
+    marginTop: spacing.xl,
+  },
   list: { flexGrow: 1, paddingVertical: 8 },
   modalBackdrop: { flex: 1, backgroundColor: colors.overlay },
   modalClose: {

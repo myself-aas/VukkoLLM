@@ -11,7 +11,7 @@ it. Status values:
 | # | Current surface | Current location | Replacement | Status |
 |---|---|---|---|---|
 | 1 | Application startup, theme host, biometric gate | `app/src/main/java/com/vukko/MainActivity.kt` | React Native host (`android/app/.../MainActivity.kt`) + `src/app/App.tsx` | adapter |
-| 2 | Main state orchestration, 553 lines, 40+ actions | `app/src/main/java/com/vukko/viewmodel/MainViewModel.kt` | Zustand stores in `src/store/*` backed by the Rust bridge | port |
+| 2 | Main state orchestration, 553 lines, 40+ actions | `app/src/main/java/com/vukko/viewmodel/MainViewModel.kt` | Zustand store in `src/screens/ChatScreen/chatStore.ts` backed by the Rust bridge | port |
 | 3 | Data access, 869 lines, seeding, chat simulation, exports, stats | `app/src/main/java/com/vukko/data/DataRepository.kt` | Split Rust services (`rust/crates/vukko-core/src/repository/*`, `services/*`) | port |
 | 4 | Room database, `vukko_sovereign.db`, version 1, destructive fallback | `app/src/main/java/com/vukko/data/local/AppDatabase.kt` | Rust SQLite + numbered migrations (`rust/crates/vukko-db`) | port |
 | 5 | Room entities (workspaces, chat_threads, chat_messages, workspace_documents) | `app/src/main/java/com/vukko/data/local/entities/*.kt` | Rust schema with identical table/column names and Room DDL compatibility | port |
@@ -30,13 +30,13 @@ it. Status values:
 | 18 | Voice input (SpeechRecognizer) | `app/src/main/java/com/vukko/ui/components/VoiceToTextHandler.kt` | Native recorder/transcription module feeding React prompt state | adapter |
 | 19 | Home-screen widget (Glance) | `app/src/main/java/com/vukko/widget/VukkoWidget.kt` | Native widget reading the shared JSON state snapshot | adapter |
 | 20 | Chat screen composition | `app/src/main/java/com/vukko/ui/screens/ChatScreen.kt` | `src/screens/ChatScreen/` | port |
-| 21 | Top bar, message list, prompt bar, typing indicator | `app/src/main/java/com/vukko/ui/components/{TopBar,MessageItem,PromptInputBar,TypingIndicator}.kt` | `src/components/{TopBar,MessageItem,PromptInputBar,TypingIndicator}/` | port |
+| 21 | Top bar, message list, prompt bar, typing indicator | `app/src/main/java/com/vukko/ui/components/{TopBar,MessageItem,PromptInputBar,TypingIndicator}.kt` | `src/components/{TopBar,MessageItem,PromptInputBar}/` (the typing indicator is the streaming row) | port |
 | 22 | Markdown + code rendering | `app/src/main/java/com/vukko/ui/components/MarkdownText.kt` | `react-native-markdown-display` wrapper in `src/components/MarkdownText/` (added with the document-import work in Phase 7) | port |
-| 23 | Workspace drawer, workspace dialogs, workspace settings | `app/src/main/java/com/vukko/ui/components/{WorkspaceDrawer,WorkspaceDialogs,WorkspaceSettingsSheet}.kt` | `src/components/{WorkspaceDrawer,WorkspaceDialogs,WorkspaceSettings}/` | port |
-| 24 | Model picker, instance connect sheet | `app/src/main/java/com/vukko/ui/components/{ModelPickerSheet,InstanceConnectSheet}.kt` | `src/components/{ModelPicker,InstanceConnect}/` | port |
-| 25 | Settings sheet | `app/src/main/java/com/vukko/ui/components/SettingsSheet.kt` | `src/screens/SettingsScreen/` + `src/components/Settings/` | port |
+| 23 | Workspace drawer, workspace dialogs, workspace settings | `app/src/main/java/com/vukko/ui/components/{WorkspaceDrawer,WorkspaceDialogs,WorkspaceSettingsSheet}.kt` | `src/components/WorkspaceDrawer/` (dialogs and the settings sheet are not ported yet) | port |
+| 24 | Model picker, instance connect sheet | `app/src/main/java/com/vukko/ui/components/{ModelPickerSheet,InstanceConnectSheet}.kt` | `src/components/ModelPicker/` (the instance-connect sheet is not ported yet) | port |
+| 25 | Settings sheet | `app/src/main/java/com/vukko/ui/components/SettingsSheet.kt` | `src/components/Settings/` (sheet) | port |
 | 26 | Sovereign storage inspector | `app/src/main/java/com/vukko/ui/components/SovereignStorageDialog.kt` | `src/components/StorageInspector/` fed by `getStorageStats()` | port |
-| 27 | GitHub manager sheet | `app/src/main/java/com/vukko/ui/components/GitHubManagerSheet.kt` | `src/screens/GitHubScreen/` + `src/components/GitHubManager/` | port |
+| 27 | GitHub manager sheet | `app/src/main/java/com/vukko/ui/components/GitHubManagerSheet.kt` | `src/components/GitHubManager/` (sheet) | port |
 | 28 | Export dialog (Markdown/JSON/text) | `app/src/main/java/com/vukko/ui/components/ExportDialog.kt` | `src/components/ExportDialog/` + Rust `exportThread` | port |
 | 29 | Quick actions, tag selection | `app/src/main/java/com/vukko/ui/components/{QuickActionsDialog,TagSelectionDialog}.kt` | Quick actions ship inside `src/components/EmptyChatState/` (`QUICK_ACTIONS`); tag editing goes through `setMessageTags` on the bridge | port |
 | 30 | Design tokens (dark background, cyan accent, bundled fonts) | `app/src/main/java/com/vukko/theme/{Color,Theme,Type}.kt`, `app/src/main/res/font/` | `src/theme/*` + same font files | port |

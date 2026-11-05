@@ -24,7 +24,12 @@ const ADVICE: Record<ErrorCode, string> = {
 
 export interface ErrorStateProps {
   error: VukkoError;
-  onRetry: () => void;
+  /**
+   * What "Retry" does. Omitted when there is nothing to retry: a retry that
+   * resends nothing is a button that fails silently, which is worse than no
+   * button at all. `retryable` alone is not enough to justify showing one.
+   */
+  onRetry?: () => void;
 }
 
 export function ErrorState({ error, onRetry }: ErrorStateProps): React.JSX.Element {
@@ -33,7 +38,7 @@ export function ErrorState({ error, onRetry }: ErrorStateProps): React.JSX.Eleme
       <Text style={styles.title}>Something went wrong</Text>
       <Text style={styles.message}>{error.message}</Text>
       <Text style={styles.advice}>{ADVICE[error.code]}</Text>
-      {error.retryable ? (
+      {error.retryable && onRetry ? (
         <Pressable
           accessibilityRole="button"
           accessibilityLabel="Retry"
