@@ -25,6 +25,7 @@
 pub mod error;
 pub mod events;
 
+use std::fmt;
 use std::path::{Path, PathBuf};
 use std::sync::{Arc, Mutex, OnceLock};
 
@@ -58,6 +59,11 @@ pub struct InitializationState {
 }
 
 /// The one object the native module holds.
+///
+/// `Debug` is derived by hand rather than automatically because the fields are
+/// not printable: a `Connection` holds no useful display form and the `Mutex`
+/// would print its interior. The database path is the one thing worth having in
+/// a log line, and it is also why `Result<Engine, _>::unwrap_err()` compiles.
 pub struct Engine {
     conn: Mutex<Connection>,
     path: PathBuf,
@@ -65,12 +71,29 @@ pub struct Engine {
     events: EventSink,
 }
 
+impl fmt::Debug for Engine {
+    fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
+        formatter
+            .debug_struct("Engine")
+            .field("path", &self.path)
+            .field("schemaVersion", &self.adoption.to_version)
+            .finish_non_exhaustive()
+    }
+}
+
 impl Engine {
     /// Opens (and upgrades) the database, then seeds a fresh install.
     pub fn open(path: impl AsRef<Path>) -> Result<Self, BridgeError> {
         let path = path.as_ref().to_path_buf();
         let (mut conn, adoption) = vukko_db::adopt(&path)?;
+        // Seeding happens once, on a fresh install. A count that is thrown away
+        // is a count nobody can explain later, so it is logged rather than
+        // discarded: a non-zero value says where the default workspace came
+        // from, and a zero on a database that should be new is a symptom.
         let seeded = bootstrap::seed_if_empty(&mut conn).map_err(BridgeError::from)?;
+        if seeded > 0 {
+            tracing::info!(seeded, "seeded a fresh database");
+        }
 
         Ok(Self {
             conn: Mutex::new(conn),

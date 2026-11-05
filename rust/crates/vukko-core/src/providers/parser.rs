@@ -672,9 +672,7 @@ mod tests {
 
     #[test]
     fn gemini_stream_handles_bare_json_and_thought_parts() {
-        let raw = concat!(
-            "{\"candidates\":[{\"content\":{\"parts\":[{\"text\":\"Weighing options.\",\"thought\":true},{\"text\":\"Final answer.\"}]},\"finishReason\":\"STOP\"}]}",
-        );
+        let raw = "{\"candidates\":[{\"content\":{\"parts\":[{\"text\":\"Weighing options.\",\"thought\":true},{\"text\":\"Final answer.\"}]},\"finishReason\":\"STOP\"}]}";
         let parsed = parse_stream(Protocol::GeminiStream, raw);
         assert_eq!(
             parsed.chunks,
