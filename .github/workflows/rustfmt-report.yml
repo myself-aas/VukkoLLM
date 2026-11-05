@@ -1,13 +1,14 @@
-name: rustfmt report
+name: rust diagnostics
 
-# Temporary diagnostic, deleted once the tree is formatted.
+# Temporary diagnostic, deleted once the numbers below are zero.
 #
 # This repository is maintained from an environment without a Rust toolchain and
-# static.rust-lang.org is unreachable there, so `cargo fmt --all --check` cannot
-# be run before a push. Rather than commit Rust that has never been formatted
-# and guess at the diff, this workflow runs the pinned rustfmt and posts the
-# diff it wants as a pull-request comment. The real gate stays in rust.yml; this
-# file cannot make unformatted code pass, it only makes the diff readable.
+# static.rust-lang.org is unreachable there, so `cargo fmt` and `cargo clippy`
+# cannot be run before a push. This workflow runs both with the pinned toolchain
+# and posts a compact report as a pull-request comment: clippy findings collapsed
+# to one line per lint (a count and the first location), because the raw output
+# is far too long for a comment. The real gates stay in rust.yml; this file
+# cannot make anything pass.
 
 on:
   pull_request:
@@ -18,45 +19,51 @@ permissions:
 
 jobs:
   report:
-    name: Print the formatting diff
+    name: Report formatting and clippy findings
     runs-on: ubuntu-latest
-    timeout-minutes: 15
+    timeout-minutes: 30
     steps:
       - uses: actions/checkout@v4
 
-      # No `toolchain:` input: rust/rust-toolchain.toml is authoritative.
       - uses: actions-rust-lang/setup-rust-toolchain@v1
         with:
-          components: rustfmt
+          components: rustfmt, clippy
 
-      - name: Collect the diff cargo fmt wants
+      - name: Collect the report
         working-directory: rust
         run: |
           set +e
-          rustc --version > /tmp/rustc.txt
-          cargo fmt --all --check > /tmp/check.txt 2>&1
-          echo "rustfmt check exit: $?" >> /tmp/check.txt
-          cargo fmt --all
-          git -c core.pager=cat diff --no-color > /tmp/fmt.patch
-          wc -l /tmp/fmt.patch
+          {
+            rustc --version
+            echo
+            echo '=== cargo fmt --all --check ==='
+            cargo fmt --all --check 2>&1 | head -40
+            echo "fmt exit: ${PIPESTATUS[0]}"
+            echo
+            echo '=== cargo clippy -- -D warnings (grouped) ==='
+          } > /tmp/report.md
+
+          cargo clippy --all-targets --all-features --message-format=short 2>&1 \
+            | grep -E '^(crates|warning|error)' > /tmp/clippy.txt
+          echo "clippy exit: $?" >> /tmp/report.md
+          echo '```' >> /tmp/report.md
+          echo "total findings: $(wc -l < /tmp/clippy.txt)" >> /tmp/report.md
+          # One line per distinct lint, with its count and first location.
+          sed -E 's/^[^ ]+ //' /tmp/clippy.txt | sed -E 's/^warning: //;s/^error: //' \
+            | sed -E "s/.*\[([a-z_:]+)\]$/\1/" | sort | uniq -c | sort -rn >> /tmp/report.md
+          echo '```' >> /tmp/report.md
+          echo 'First occurrence of each lint:' >> /tmp/report.md
+          echo '```' >> /tmp/report.md
+          grep -oE '\[[a-z_:]+\]$' /tmp/clippy.txt | sort -u > /tmp/lints.txt
+          while read -r lint; do
+            name=$(echo "$lint" | tr -d '[]')
+            grep -m1 -F "$lint" /tmp/clippy.txt >> /tmp/report.md
+          done < /tmp/lints.txt
+          echo '```' >> /tmp/report.md
           exit 0
 
-      - name: Post the diff on the pull request
+      - name: Post the report on the pull request
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           PR: ${{ github.event.pull_request.number }}
-        run: |
-          {
-            echo 'Rust formatting report (temporary workflow, safe to delete).'
-            echo
-            echo '```'
-            cat /tmp/rustc.txt /tmp/check.txt
-            echo '```'
-            echo
-            echo 'Diff `cargo fmt --all` wants:'
-            echo
-            echo '```diff'
-            cat /tmp/fmt.patch
-            echo '```'
-          } > /tmp/body.md
-          gh pr comment "$PR" --body-file /tmp/body.md --repo "$GITHUB_REPOSITORY"
+        run: gh pr comment "$PR" --body-file /tmp/report.md --repo "$GITHUB_REPOSITORY"
