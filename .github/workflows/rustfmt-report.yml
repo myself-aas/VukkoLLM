@@ -83,6 +83,15 @@ jobs:
               echo '```' >> /tmp/report.md
             fi
           done
+
+          # The fmt diff, verbatim, so it can be applied rather than retyped.
+          echo '### Diff `cargo fmt` wants' >> /tmp/report.md
+          echo '```diff' >> /tmp/report.md
+          cd /home/user 2>/dev/null || cd ..
+          cd "$GITHUB_WORKSPACE/rust" 2>/dev/null || true
+          cargo fmt --all
+          git -c core.pager=cat diff --no-color -- rust >> /tmp/report.md
+          echo '```' >> /tmp/report.md
           exit 0
 
       - name: Post the report on the pull request
