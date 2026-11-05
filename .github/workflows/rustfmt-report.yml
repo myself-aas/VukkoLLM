@@ -34,7 +34,8 @@ jobs:
           echo 'Which toolchain can resolve the dependency graph at all?' >> /tmp/report.md
           echo >> /tmp/report.md
 
-          for tc in 1.79.0 1.85.0 stable; do
+          for tc in 1.85.0 1.89.0; do
+            rustup component add --toolchain "$tc" rustfmt clippy >/dev/null 2>&1
             {
               echo "=== $tc ==="
               echo '```'
@@ -69,21 +70,15 @@ jobs:
             echo >> /tmp/report.md
           done
 
-          # The 1.85 findings, grouped, with the first occurrence of each lint.
-          if [ -s /tmp/clippy.1.85.0.txt ]; then
-            echo '### Lints under 1.85.0' >> /tmp/report.md
-            echo '```' >> /tmp/report.md
-            sed -E 's/^.*: (warning|error): //' /tmp/clippy.1.85.0.txt \
-              | sed -E 's/.*\[([a-z_:]+)\]$/\1/' | sort | uniq -c | sort -rn >> /tmp/report.md
-            echo '```' >> /tmp/report.md
-            echo '### First occurrence of each lint (1.85.0)' >> /tmp/report.md
-            echo '```' >> /tmp/report.md
-            grep -oE '\[[a-z_:]+\]$' /tmp/clippy.1.85.0.txt | sort -u > /tmp/lints.txt
-            while read -r lint; do
-              grep -m1 -F "$lint" /tmp/clippy.1.85.0.txt >> /tmp/report.md
-            done < /tmp/lints.txt
-            echo '```' >> /tmp/report.md
-          fi
+          # Every finding, one line each: the file to edit, the lint and the text.
+          for tc in 1.85.0 1.89.0; do
+            if [ -s "/tmp/clippy.$tc.txt" ]; then
+              echo "### Findings under $tc" >> /tmp/report.md
+              echo '```' >> /tmp/report.md
+              sed -E 's|/home/runner/work/VukkoLLM/VukkoLLM/||' "/tmp/clippy.$tc.txt" >> /tmp/report.md
+              echo '```' >> /tmp/report.md
+            fi
+          done
           exit 0
 
       - name: Post the report on the pull request
