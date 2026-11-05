@@ -84,15 +84,16 @@ jobs:
 
       # Warnings are errors: a warning that survives a PR becomes permanent.
       #
-      # `-D warnings` covers the default lint groups, which is what this gate
-      # means. It does not promote `clippy::pedantic`, and it must not: pedantic
-      # is optional advice (doc backticks, `# Errors` sections, function length)
-      # that the crates opt into with `#![warn(clippy::pedantic)]` so it shows up
-      # without failing the build. Denying it as well made every one of those
-      # suggestions a compile error and the gate unusable.
+      # `-D warnings` denies *every* warning, which includes the pedantic ones
+      # the crates opt into with `#![warn(clippy::pedantic)]` — so the attribute
+      # and the gate contradict each other unless pedantic is allowed back
+      # afterwards. Without the `-A`, doc-backtick style, `# Errors` sections and
+      # function length become build failures, which is not what a correctness
+      # gate is for. Pedantic stays visible as a warning; everything in the
+      # default groups still fails the build. tests/ci pins both halves of this.
       - name: Clippy
         working-directory: rust
-        run: cargo clippy --all-targets --all-features -- -D warnings
+        run: cargo clippy --all-targets --all-features -- -D warnings -A clippy::pedantic
 
       - name: Tests
         working-directory: rust

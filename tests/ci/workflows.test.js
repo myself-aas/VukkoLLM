@@ -250,14 +250,15 @@ describe('the packaging contract', () => {
     }
   });
 
-  test('clippy denies warnings without denying its optional advice', () => {
-    // `-D warnings` covers the default groups, which is the gate. It must not
-    // start denying `clippy::pedantic`: the crates opt into pedantic as a warn
-    // so the suggestions are visible, and denying them turns doc-backtick and
-    // "# Errors section" advice into build failures.
+  test('clippy denies warnings and allows its optional advice back', () => {
+    // `-D warnings` denies everything, including the pedantic warnings the
+    // crates opt into with `#![warn(clippy::pedantic)]`. The `-A` afterwards is
+    // what keeps that attribute from turning style advice into build failures,
+    // and the order matters: rustc applies the last matching flag.
     const clippy = /cargo clippy[^\n]*/.exec(read('.github/workflows/rust.yml'))?.[0] ?? '';
     expect(clippy).toContain('-D warnings');
-    expect(clippy).not.toMatch(/pedantic/);
+    expect(clippy).toContain('-A clippy::pedantic');
+    expect(clippy.indexOf('-D warnings')).toBeLessThan(clippy.indexOf('-A clippy::pedantic'));
   });
 
   test('the packaging guide names every target the plan requires', () => {

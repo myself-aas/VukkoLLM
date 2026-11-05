@@ -34,7 +34,7 @@ jobs:
           echo 'Which toolchain can resolve the dependency graph at all?' >> /tmp/report.md
           echo >> /tmp/report.md
 
-          for tc in 1.85.0 1.89.0; do
+          for tc in 1.89.0; do
             rustup component add --toolchain "$tc" rustfmt clippy >/dev/null 2>&1
             {
               echo "=== $tc ==="
@@ -51,8 +51,10 @@ jobs:
               else
                 fmt=$(cargo "+$tc" fmt --all --check >/dev/null 2>&1; echo $?)
                 echo "fmt exit: $fmt" >> /tmp/report.md
-                cargo "+$tc" clippy --all-targets --all-features --message-format=short \
-                  > /tmp/clippy.$tc.raw 2>&1
+                # Same flags as the gate in rust.yml, so this report predicts
+                # CI rather than approximating it.
+                cargo "+$tc" clippy --all-targets --all-features -- -D warnings \
+                  -A clippy::pedantic > /tmp/clippy.$tc.raw 2>&1
                 clippy=$?
                 sed -e 's/\x1b\[[0-9;]*m//g' /tmp/clippy.$tc.raw \
                   | grep -E ': (warning|error):' > /tmp/clippy.$tc.txt
@@ -71,7 +73,7 @@ jobs:
           done
 
           # Every finding, one line each: the file to edit, the lint and the text.
-          for tc in 1.85.0 1.89.0; do
+          for tc in 1.89.0; do
             if [ -s "/tmp/clippy.$tc.txt" ]; then
               echo "### Findings under $tc" >> /tmp/report.md
               echo '```' >> /tmp/report.md
