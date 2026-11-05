@@ -40,8 +40,10 @@ export interface ChatState {
   setProvidersNeedingKeys: (providers: ProviderType[]) => void;
   beginRequest: (requestId: string, userMessage: ChatMessage, placeholder: ChatMessage) => void;
   appendDelta: (requestId: string, messageId: string, delta: string) => void;
-  complete: (requestId: string, messageId: string) => void;
+  complete: (requestId: string, message: ChatMessage) => void;
   fail: (requestId: string, error: VukkoError) => void;
+  /** A failure that happened before a request existed (a send that never started). */
+  reportError: (error: VukkoError) => void;
   clearError: () => void;
 }
 
@@ -61,7 +63,10 @@ export const useChatStore = create<ChatState>((set) => ({
   setWorkspaces: (workspaces) => set({ workspaces }),
   setWorkspace: (workspace) => set({ workspace }),
   setThreads: (threads) => set({ threads }),
-  setActiveThread: (activeThreadId) => set({ activeThreadId }),
+  setActiveThread: (activeThreadId) =>
+    // Switching threads clears the transcript: a stale message from the
+    // previous thread must never be visible under the new one.
+    set({ activeThreadId, messages: [], error: null }),
   setMessages: (messages) => set({ messages }),
   setDraft: (draft) => set({ draft }),
   setSelectedModel: (selectedModel) => set({ selectedModel }),
@@ -88,14 +93,21 @@ export const useChatStore = create<ChatState>((set) => ({
       };
     }),
 
-  complete: (requestId, messageId) =>
+  complete: (requestId, message) =>
     set((state) => {
-      if (state.activeRequestId !== requestId) return state;
+      if (state.activeRequestId !== requestId) {
+        // A completion for a request this store never started must not stop the
+        // live one: the stream would freeze mid-answer.
+        return state;
+      }
       return {
         activeRequestId: null,
         status: 'IDLE',
-        messages: state.messages.map((message) =>
-          message.id === messageId ? { ...message, isStreaming: false } : message,
+        // The service owns the persisted row, so its copy is authoritative: it
+        // carries the final content, citations, reasoning and tool calls that
+        // the optimistic placeholder never had.
+        messages: state.messages.map((existing) =>
+          existing.id === message.id ? { ...message, isStreaming: false } : existing,
         ),
       };
     }),
@@ -112,6 +124,8 @@ export const useChatStore = create<ChatState>((set) => ({
         ),
       };
     }),
+
+  reportError: (error) => set({ error, status: 'IDLE', activeRequestId: null }),
 
   clearError: () => set({ error: null }),
 }));

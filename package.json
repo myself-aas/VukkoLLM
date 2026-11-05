@@ -3,7 +3,7 @@
   "version": "1.0.0",
   "private": true,
   "license": "SEE LICENSE IN LICENSE",
-  "description": "Vukko \u2014 local-first AI chat workspace (React Native + Rust migration target)",
+  "description": "Vukko — local-first AI chat workspace (React Native + Rust migration target)",
   "engines": {
     "node": ">=20.19.4"
   },

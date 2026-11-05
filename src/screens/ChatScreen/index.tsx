@@ -53,10 +53,16 @@ export function ChatScreen({
   const [exportOpen, setExportOpen] = useState(false);
 
   const openWorkspace = async (workspaceId: string) => {
+    const next = store.workspaces.find((candidate) => candidate.id === workspaceId);
+    if (!next) return;
+    setDrawerOpen(false);
+    // The header must name the workspace being opened, not the previous one;
+    // the transcript is cleared by setActiveThread before the rows arrive.
+    store.setWorkspace(next);
+    store.setActiveThread(null);
     const result = await loadWorkspace(workspaceId);
     store.setThreads(result.threads);
     store.setMessages(result.messages);
-    setDrawerOpen(false);
   };
 
   const openFirstWorkspace = React.useCallback(async () => {
@@ -84,7 +90,7 @@ export function ChatScreen({
         useChatStore.getState().appendDelta(event.requestId, event.messageId, event.delta);
         break;
       case 'message.completed':
-        useChatStore.getState().complete(event.requestId, event.message.id);
+        useChatStore.getState().complete(event.requestId, event.message);
         break;
       case 'message.failed':
         useChatStore.getState().fail(event.requestId, event.error);
@@ -99,18 +105,34 @@ export function ChatScreen({
     const model = store.selectedModel;
     if (!workspace) return;
 
-    const userMessage = {
-      id: `msg_local_${Date.now()}`,
-      threadId: store.activeThreadId ?? '',
-      sender: 'USER' as const,
-      content: prompt,
-      timestamp: Date.now(),
+    let state;
+    try {
+      state = await chatService.send({
+        threadId: store.activeThreadId ?? '',
+        content: prompt,
+        provider: model?.provider ?? 'GEMINI',
+        modelId: model?.id ?? 'gemini-2.5-flash',
+      });
+    } catch (cause) {
+      // A send that fails before streaming (an empty prompt, a storage error)
+      // still has to tell the user; swallowing it would leave a blank screen.
+      useChatStore.getState().reportError({
+        code: (cause as { code?: string }).code === 'VALIDATION' ? 'VALIDATION' : 'STORAGE',
+        message: cause instanceof Error ? cause.message : 'The message could not be sent',
+        retryable: false,
+      });
+      return;
+    }
+
+    // The service allocates and persists both rows, so the transcript must
+    // render *those* ids: a locally invented id would receive no deltas.
+    const base = {
+      timestamp: state.startedAt,
       thinking: null,
       thinkingDurationMs: null,
       citations: [],
       toolsUsed: [],
       attachments: [],
-      isStreaming: false,
       isAgentExecution: false,
       agentSteps: [],
       createdDocumentId: null,
@@ -119,22 +141,26 @@ export function ChatScreen({
       isPinned: false,
       tags: [],
     };
-    const placeholder = {
-      ...userMessage,
-      id: `msg_pending_${Date.now()}`,
-      sender: 'ASSISTANT' as const,
-      content: '',
-      isStreaming: true,
-    };
 
-    const state = await chatService.send({
-      threadId: store.activeThreadId ?? '',
-      content: prompt,
-      provider: model?.provider ?? 'GEMINI',
-      modelId: model?.id ?? 'gemini-2.5-flash',
-    });
-
-    useChatStore.getState().beginRequest(state.requestId, userMessage, placeholder);
+    useChatStore.getState().beginRequest(
+      state.requestId,
+      {
+        ...base,
+        id: `msg_local_user_${state.requestId}`,
+        threadId: state.threadId,
+        sender: 'USER',
+        content: prompt,
+        isStreaming: false,
+      },
+      {
+        ...base,
+        id: state.assistantMessageId,
+        threadId: state.threadId,
+        sender: 'ASSISTANT',
+        content: '',
+        isStreaming: true,
+      },
+    );
   };
 
   return (

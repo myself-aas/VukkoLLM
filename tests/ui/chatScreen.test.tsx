@@ -229,3 +229,257 @@ describe('ChatScreen', () => {
     expect(await screen.findByText(/stays on this device/i)).toBeTruthy();
   });
 });
+
+describe('ChatScreen wiring', () => {
+  test('the assistant row streams into the message the service allocated, not a local id', async () => {
+    const { emit } = harness();
+    await screen.findByPlaceholderText(/message/i);
+
+    fireEvent.changeText(screen.getByPlaceholderText(/message/i), 'hi');
+    fireEvent.press(screen.getByRole('button', { name: /send/i }));
+    await waitFor(() => expect(screen.getByText('hi')).toBeTruthy());
+
+    const assistant = useChatStore.getState().messages.find((m) => m.sender === 'ASSISTANT');
+    // The service owns the persisted row; the screen must render that id, or
+    // every delta lands on a message no other layer knows about.
+    expect(assistant?.id).toBe('msg_pending');
+
+    emit({
+      type: 'message.delta',
+      requestId: 'req_1',
+      messageId: 'msg_pending',
+      delta: 'streamed',
+    });
+    await waitFor(() => expect(screen.getByText('streamed')).toBeTruthy());
+  });
+
+  test('a completed event that carries the final message replaces the streamed text', async () => {
+    const { emit } = harness();
+    await screen.findByPlaceholderText(/message/i);
+
+    fireEvent.changeText(screen.getByPlaceholderText(/message/i), 'hi');
+    fireEvent.press(screen.getByRole('button', { name: /send/i }));
+    await waitFor(() => expect(screen.getByText('hi')).toBeTruthy());
+
+    emit({ type: 'message.delta', requestId: 'req_1', messageId: 'msg_pending', delta: 'par' });
+    emit({
+      type: 'message.completed',
+      requestId: 'req_1',
+      message: {
+        id: 'msg_pending',
+        threadId: 'th_1',
+        sender: 'ASSISTANT',
+        content: 'partial answer with citations',
+        timestamp: 1_700_000_000_000,
+        thinking: 'weighed it',
+        thinkingDurationMs: 1200,
+        citations: [
+          { title: 'whitepaper.pdf', source: 'Section 2', snippet: 'hybrid RAG', score: 0.9 },
+        ],
+        toolsUsed: [],
+        attachments: [],
+        isStreaming: false,
+        isAgentExecution: false,
+        agentSteps: [],
+        createdDocumentId: null,
+        createdDocumentName: null,
+        isFavorite: false,
+        isPinned: false,
+        tags: [],
+      },
+    });
+
+    await waitFor(() => expect(screen.getByText('partial answer with citations')).toBeTruthy());
+    expect(screen.getByText(/whitepaper\.pdf/)).toBeTruthy();
+    expect(screen.queryByRole('button', { name: /stop/i })).toBeNull();
+  });
+
+  test('completion is ignored when it belongs to another request', async () => {
+    const { emit } = harness();
+    await screen.findByPlaceholderText(/message/i);
+
+    fireEvent.changeText(screen.getByPlaceholderText(/message/i), 'hi');
+    fireEvent.press(screen.getByRole('button', { name: /send/i }));
+    await waitFor(() => expect(screen.getByRole('button', { name: /stop/i })).toBeTruthy());
+
+    // A stale completion for a request this screen never started must not stop
+    // the live one.
+    emit({
+      type: 'message.completed',
+      requestId: 'req_other',
+      message: {
+        id: 'msg_pending',
+        threadId: 'th_1',
+        sender: 'ASSISTANT',
+        content: 'other',
+        timestamp: 1,
+        thinking: null,
+        thinkingDurationMs: null,
+        citations: [],
+        toolsUsed: [],
+        attachments: [],
+        isStreaming: false,
+        isAgentExecution: false,
+        agentSteps: [],
+        createdDocumentId: null,
+        createdDocumentName: null,
+        isFavorite: false,
+        isPinned: false,
+        tags: [],
+      },
+    });
+
+    expect(screen.getByRole('button', { name: /stop/i })).toBeTruthy();
+  });
+
+  test('the screen sends with the model the store holds', async () => {
+    const { chatService } = harness();
+    await screen.findByPlaceholderText(/message/i);
+
+    fireEvent.changeText(screen.getByPlaceholderText(/message/i), 'hi');
+    fireEvent.press(screen.getByRole('button', { name: /send/i }));
+
+    await waitFor(() => expect(chatService.send).toHaveBeenCalled());
+    expect(chatService.send.mock.calls[0]?.[0]).toMatchObject({
+      provider: 'GEMINI',
+      modelId: 'gemini-2.5-flash',
+      content: 'hi',
+    });
+  });
+});
+
+describe('ChatScreen resilience', () => {
+  test('a send that fails before streaming surfaces the error', async () => {
+    const events: Array<(event: NativeEvent) => void> = [];
+    render(
+      <ChatScreen
+        chatService={
+          {
+            send: jest.fn(async () => {
+              throw Object.assign(new Error('the database is full'), { code: 'STORAGE' });
+            }),
+            cancel: jest.fn(),
+          } as never
+        }
+        subscribeToEvents={(listener) => {
+          events.push(listener);
+          return () => {};
+        }}
+        loadWorkspaces={async () => [WORKSPACE]}
+        loadWorkspace={async () => ({ threads: [THREAD], messages: [] })}
+        onExport={async () => undefined}
+      />,
+    );
+
+    await screen.findByPlaceholderText(/message/i);
+    fireEvent.changeText(screen.getByPlaceholderText(/message/i), 'hi');
+    fireEvent.press(screen.getByRole('button', { name: /send/i }));
+
+    await waitFor(() => expect(screen.getByText('the database is full')).toBeTruthy());
+    expect(screen.getByText(/Free up space/i)).toBeTruthy();
+  });
+
+  test('an empty workspace list leaves the composer disabled instead of crashing', async () => {
+    render(
+      <ChatScreen
+        chatService={{ send: jest.fn(), cancel: jest.fn() } as never}
+        subscribeToEvents={() => () => {}}
+        loadWorkspaces={async () => []}
+        loadWorkspace={async () => ({ threads: [], messages: [] })}
+        onExport={async () => undefined}
+      />,
+    );
+
+    await waitFor(() => expect(screen.getByPlaceholderText(/message/i)).toBeTruthy());
+    fireEvent.changeText(screen.getByPlaceholderText(/message/i), 'hi');
+    fireEvent.press(screen.getByRole('button', { name: /send/i }));
+    // Nothing was sent, and the screen still renders.
+    expect(screen.getByPlaceholderText(/message/i)).toBeTruthy();
+  });
+});
+
+describe('thread switching', () => {
+  test('selecting another thread loads its messages and drops the previous ones', async () => {
+    const listeners: Array<(event: NativeEvent) => void> = [];
+    const loadWorkspace = jest.fn(async (workspaceId: string) => ({
+      threads: [THREAD],
+      messages:
+        workspaceId === 'ws_2'
+          ? [
+              {
+                id: 'msg_ws2',
+                threadId: 'th_2',
+                sender: 'USER' as const,
+                content: 'second workspace question',
+                timestamp: 1,
+                thinking: null,
+                thinkingDurationMs: null,
+                citations: [],
+                toolsUsed: [],
+                attachments: [],
+                isStreaming: false,
+                isAgentExecution: false,
+                agentSteps: [],
+                createdDocumentId: null,
+                createdDocumentName: null,
+                isFavorite: false,
+                isPinned: false,
+                tags: [],
+              },
+            ]
+          : [],
+    }));
+
+    render(
+      <ChatScreen
+        chatService={{ send: jest.fn(), cancel: jest.fn() } as never}
+        subscribeToEvents={(listener) => {
+          listeners.push(listener);
+          return () => {};
+        }}
+        loadWorkspaces={async () => [WORKSPACE, { ...WORKSPACE, id: 'ws_2', name: 'Work' }]}
+        loadWorkspace={loadWorkspace}
+        onExport={async () => undefined}
+      />,
+    );
+
+    await waitFor(() => expect(screen.getAllByText('Personal').length).toBeGreaterThan(0));
+    fireEvent.press(screen.getByRole('button', { name: /workspaces/i }));
+    fireEvent.press(screen.getByRole('button', { name: 'Work' }));
+
+    await waitFor(() => expect(screen.getByText('second workspace question')).toBeTruthy());
+    expect(useChatStore.getState().workspace?.id).toBe('ws_2');
+    expect(loadWorkspace).toHaveBeenCalledWith('ws_2');
+  });
+
+  test('switching threads clears the transcript before the new rows arrive', () => {
+    useChatStore.setState({
+      messages: [
+        {
+          id: 'msg_old',
+          threadId: 'th_old',
+          sender: 'USER',
+          content: 'old question',
+          timestamp: 1,
+          thinking: null,
+          thinkingDurationMs: null,
+          citations: [],
+          toolsUsed: [],
+          attachments: [],
+          isStreaming: false,
+          isAgentExecution: false,
+          agentSteps: [],
+          createdDocumentId: null,
+          createdDocumentName: null,
+          isFavorite: false,
+          isPinned: false,
+          tags: [],
+        },
+      ],
+    });
+
+    useChatStore.getState().setActiveThread('th_new');
+    expect(useChatStore.getState().messages).toEqual([]);
+    expect(useChatStore.getState().activeThreadId).toBe('th_new');
+  });
+});

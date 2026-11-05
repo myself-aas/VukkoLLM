@@ -81,10 +81,12 @@ pub async fn run_backup<T: Serialize>(
     workspaces: &T,
     workspace_count: u32,
     uploader: &dyn BackupUploader,
+    // The trigger is part of the result contract: a scheduled run and a manual
+    // run are the same work, and the caller already knows which it asked for.
     trigger: BackupTrigger,
     now: Timestamp,
 ) -> BackupResult {
-    let _ = trigger;
+    tracing::debug!(?trigger, "running backup");
 
     if !settings.enabled {
         return BackupResult {

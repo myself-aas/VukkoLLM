@@ -170,9 +170,8 @@ mod tests {
 
     #[test]
     fn an_empty_base_url_falls_back_to_the_documented_default() {
-        let selection = select(remote(ProviderType::OPENAI, "k"), FakeTransport::new(200, ""))
+        let _selection = select(remote(ProviderType::OPENAI, "k"), FakeTransport::new(200, ""))
             .expect("builds");
-        let _ = selection;
         assert_eq!(
             descriptor(ProviderType::OPENAI).default_base_url,
             "https://api.openai.com/v1"
