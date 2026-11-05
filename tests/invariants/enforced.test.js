@@ -155,3 +155,43 @@ describe('every invariant names code and a test that exist', () => {
     }
   });
 });
+
+describe('the README tells the truth about what is done', () => {
+  const readme = () => readFileSync(join(ROOT, 'README.md'), 'utf8');
+
+  test('every phase in the migration table names paths that exist', () => {
+    const table = readme()
+      .split('\n')
+      .filter((line) => /^\| \d+ /.test(line));
+    expect(table.length).toBeGreaterThanOrEqual(12);
+
+    // `services/{files,backup}.rs` is shorthand for two files; every other
+    // backticked entry is one path, relative to the repository root.
+    const expand = (entry) => {
+      const brace = /^(.*)\{([^}]+)\}(.*)$/.exec(entry);
+      if (!brace) return [entry];
+      return brace[2].split(',').map((part) => `${brace[1]}${part.trim()}${brace[3]}`);
+    };
+
+    const missing = [];
+    for (const line of table) {
+      const cells = line.split('|').map((cell) => cell.trim());
+      // | phase | state | where | → split leaves an empty first and last cell.
+      const where = cells[3] ?? '';
+      for (const match of where.matchAll(/`([^`]+)`/g)) {
+        for (const candidate of expand(match[1].replace(/\/$/, ''))) {
+          if (!existsSync(join(ROOT, candidate))) {
+            missing.push(`${cells[1]}: ${candidate}`);
+          }
+        }
+      }
+    }
+    expect(missing).toEqual([]);
+  });
+
+  test('the README does not claim a green build it cannot have', () => {
+    const text = readme();
+    expect(text).toMatch(/no Rust toolchain/);
+    expect(text).toMatch(/RUST_VERIFICATION/);
+  });
+});
