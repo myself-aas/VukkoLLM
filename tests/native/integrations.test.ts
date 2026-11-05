@@ -54,8 +54,18 @@ function secureStorage(): SecureStorageModule & { secrets: Map<string, string> }
 function files(): FileModule {
   return {
     pickDocuments: jest.fn(async () => [
-      { uri: 'file:///data/user/0/com.vukko/cache/paper.pdf', name: 'paper.pdf', mimeType: 'application/pdf', sizeBytes: 2048 },
-      { uri: 'content://com.android.providers.downloads/document/42', name: 'notes.md', mimeType: 'text/markdown', sizeBytes: 512 },
+      {
+        uri: 'file:///data/user/0/com.vukko/cache/paper.pdf',
+        name: 'paper.pdf',
+        mimeType: 'application/pdf',
+        sizeBytes: 2048,
+      },
+      {
+        uri: 'content://com.android.providers.downloads/document/42',
+        name: 'notes.md',
+        mimeType: 'text/markdown',
+        sizeBytes: 512,
+      },
     ]),
     writeExport: jest.fn(async (fileName: string) => ({ uri: `file:///exports/${fileName}` })),
     shareFile: jest.fn(async () => undefined),
@@ -200,7 +210,12 @@ describe('files and document imports', () => {
     const module: FileModule = {
       ...files(),
       pickDocuments: jest.fn(async () => [
-        { uri: 'file:///x/archive.zip', name: 'archive.zip', mimeType: 'application/zip', sizeBytes: 10 },
+        {
+          uri: 'file:///x/archive.zip',
+          name: 'archive.zip',
+          mimeType: 'application/zip',
+          sizeBytes: 10,
+        },
       ]),
     };
     const service = createFileService({ module, sandboxRoot: '/tmp' });
@@ -248,9 +263,9 @@ describe('background backup', () => {
     const module = backgroundTasks();
     const scheduler = createBackupScheduler({ module });
 
-    await expect(
-      scheduler.schedule({ ...settings, target: 'CLOUD_BUCKET' }),
-    ).rejects.toMatchObject({ code: 'UNSUPPORTED' });
+    await expect(scheduler.schedule({ ...settings, target: 'CLOUD_BUCKET' })).rejects.toMatchObject(
+      { code: 'UNSUPPORTED' },
+    );
     expect(module.scheduleBackup).not.toHaveBeenCalled();
   });
 

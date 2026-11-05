@@ -20,7 +20,7 @@
  * (Phase 4 Step 4.3): one event per persisted mutation, drained by the caller.
  */
 
-const { randomUUID } = require('node:crypto');
+const { createHash, randomUUID } = require('node:crypto');
 const { DatabaseSync } = require('node:sqlite');
 
 const { adoptDatabase } = require('../migration/support/adopt.cjs');
@@ -433,7 +433,12 @@ function createEngine(databasePath) {
       const thread = await threads.get(threadId);
       const sender = input.sender ?? 'USER';
       if (!SENDERS.has(sender)) throw validation(`unknown sender: ${sender}`);
-      const content = requireText(input.content, 'content', { max: 200_000 });
+      // A streaming placeholder legitimately starts empty; every other message
+      // must carry text (an empty user turn is a UI bug, not a transcript).
+      const content =
+        input.isStreaming && (input.content ?? '') === ''
+          ? ''
+          : requireText(input.content, 'content', { max: 200_000 });
       const timestamp = input.timestamp ?? now();
       if (!Number.isInteger(timestamp) || timestamp <= 0)
         throw validation('timestamp must be integer milliseconds');
@@ -501,6 +506,50 @@ function createEngine(databasePath) {
         message.id,
       );
       emit({ type: 'message.updated', message: await messages.get(message.id) });
+    },
+    /**
+     * Appends streamed text to a message that is still streaming.
+     *
+     * A late delta for a message that already completed or failed is a
+     * `CANCELLED` error rather than a silent append: the Rust repository
+     * (`message_repository::append_delta`) rejects it for the same reason, and
+     * silently accepting it would resurrect a cancelled answer.
+     */
+    async appendDelta(id, delta) {
+      const message = await messages.get(id);
+      if (!message.isStreaming) throw new EngineError('CANCELLED', 'request cancelled');
+      if (typeof delta !== 'string') throw validation('delta must be a string');
+      db.prepare('UPDATE chat_messages SET content = content || ? WHERE id = ?').run(delta, id);
+      return messages.get(id);
+    },
+    /** Finishes a streaming message with its final content and metadata. */
+    async complete(id, finalContent, options = {}) {
+      const message = await messages.get(id);
+      if (typeof finalContent !== 'string') {
+        throw validation('final content must be a string');
+      }
+      db.prepare(
+        `UPDATE chat_messages SET content = ?, isStreaming = 0, thinking = ?,
+           thinkingDurationMs = ?, citationsJson = ? WHERE id = ?`,
+      ).run(
+        finalContent,
+        options.thinking ?? message.thinking,
+        options.thinkingDurationMs ?? message.thinkingDurationMs,
+        JSON.stringify(options.citations ?? message.citations),
+        id,
+      );
+      refreshThreadCounters(message.threadId, finalContent.slice(0, 120));
+      const completed = await messages.get(id);
+      emit({ type: 'message.updated', message: completed });
+      return completed;
+    },
+    /** Marks a message as failed: it stops streaming and stores no content. */
+    async fail(id, reason) {
+      await messages.get(id);
+      db.prepare('UPDATE chat_messages SET isStreaming = 0 WHERE id = ?').run(id);
+      const failed = await messages.get(id);
+      emit({ type: 'message.failed', message: failed, reason: String(reason ?? '') });
+      return failed;
     },
     async delete(id) {
       const message = await messages.get(id);
@@ -647,6 +696,108 @@ function createEngine(databasePath) {
     },
   };
 
+  /**
+   * The export renderer, mirroring `services/export.rs`.
+   *
+   * The header, the per-message headings and the JSON shape are byte-compatible
+   * with the Rust exporter, because a user who exports the same thread from the
+   * Kotlin app and from this one must be able to diff the files.
+   */
+  const exports = {
+    async thread(threadId, format, exportedAt = now()) {
+      requireId(threadId, 'threadId');
+      const thread = await threads.get(threadId);
+      const rows = await messages.list(thread.id);
+      const label = (sender) => (sender === 'USER' ? 'USER' : 'ASSISTANT');
+
+      let content;
+      let extension;
+      let mimeType;
+      switch (format) {
+        case 'md':
+        case 'markdown': {
+          const lines = [
+            '# Vukko Chat Export (Local Sovereign Storage)',
+            `*Thread ID: ${thread.id}*`,
+            `*Storage: Rust SQLite (\`${DATABASE_NAME}\`)*`,
+            '',
+          ];
+          for (const message of rows) {
+            lines.push(`### ${label(message.sender)}`);
+            lines.push(message.content);
+            lines.push('');
+            if (message.citations.length > 0) {
+              lines.push('**Citations:**');
+              for (const citation of message.citations) {
+                lines.push(`- [${citation.title}] ${citation.snippet}`);
+              }
+              lines.push('');
+            }
+          }
+          content = lines.join('\n');
+          extension = 'md';
+          mimeType = 'text/markdown';
+          break;
+        }
+        case 'json': {
+          content = JSON.stringify(
+            {
+              threadId: thread.id,
+              database: DATABASE_NAME,
+              dataSovereignty: true,
+              messages: rows.map((message) => ({
+                sender: label(message.sender),
+                content: message.content,
+              })),
+            },
+            null,
+            2,
+          );
+          extension = 'json';
+          mimeType = 'application/json';
+          break;
+        }
+        case 'txt':
+        case 'text': {
+          content = rows
+            .map((message) => `${label(message.sender)}: ${message.content}`)
+            .join('\n\n');
+          extension = 'txt';
+          mimeType = 'text/plain';
+          break;
+        }
+        default:
+          throw validation(`unknown export format: ${format}`);
+      }
+
+      return {
+        format,
+        fileName: `vukko_thread_${thread.id}_${exportedAt}.${extension}`,
+        mimeType,
+        content,
+        bytes: content.length,
+        messageCount: rows.length,
+        exportedAt,
+      };
+    },
+  };
+
+  /** A backup archive, mirroring `services/backup.rs`. */
+  const backups = {
+    async archive(completedAt = now()) {
+      const all = await workspaces.list();
+      const archive = JSON.stringify({ workspaces: all }, null, 2);
+      const seconds = Math.floor(completedAt / 1000);
+      const date = new Date(seconds * 1000);
+      const pad = (value) => String(value).padStart(2, '0');
+      const fileName =
+        `vukko_backup_${date.getUTCFullYear()}${pad(date.getUTCMonth() + 1)}${pad(date.getUTCDate())}` +
+        `_${pad(date.getUTCHours())}${pad(date.getUTCMinutes())}${pad(date.getUTCSeconds())}.json`;
+      const checksum = createHash('sha256').update(archive).digest('hex');
+      return { fileName, checksum, archive, workspaceCount: all.length, completedAt };
+    },
+  };
+
   return {
     async initialize() {
       adoptDatabase(databasePath);
@@ -673,6 +824,8 @@ function createEngine(databasePath) {
     documents,
     settings,
     storage,
+    exports,
+    backups,
     async counts() {
       const count = (table) => db.prepare(`SELECT COUNT(*) AS n FROM \`${table}\``).get().n;
       return {

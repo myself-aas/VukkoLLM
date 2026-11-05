@@ -1,0 +1,52 @@
+name: migration-tests
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+concurrency:
+  group: migration-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  legacy-fixtures:
+    name: Legacy Room fixtures and adoption
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version-file: .nvmrc
+          cache: 'npm'
+
+      - run: npm ci
+
+      # The fixture database is generated from the legacy schema, so the test
+      # data cannot drift from the schema it claims to represent.
+      - name: Build the legacy Room fixtures
+        run: npm run test:fixtures
+
+      - name: Migration suites (fresh, repeated, corrupted, every version)
+        run: npx jest tests/migration tests/repository tests/contracts --ci --runInBand
+
+      # The Rust runner executes the same SQL; CI is where it is compiled.
+      - uses: actions-rust-lang/setup-rust-toolchain@v1
+        with:
+          toolchain: 1.79.0
+
+      - name: Rust migration tests
+        working-directory: rust
+        run: cargo test -p vukko-db --all-features
+
+      - name: Upload the fixture database on failure
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: legacy-fixtures
+          path: tests/migration/fixtures/*.db
+          if-no-files-found: ignore
+          retention-days: 7

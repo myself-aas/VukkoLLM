@@ -1,0 +1,77 @@
+name: rust
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    paths:
+      - 'rust/**'
+      - 'tests/tooling/**'
+      - '.github/workflows/rust.yml'
+  workflow_dispatch:
+
+env:
+  RUST_VERSION: 1.79.0
+  CARGO_TERM_COLOR: always
+
+concurrency:
+  group: rust-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  # Parses every .rs file before cargo runs. A syntax error is reported with the
+  # file and line by the syntax gate; cargo would report it too, but only after
+  # a full toolchain install, and its message points at the macro expansion.
+  syntax:
+    name: Rust syntax gate
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version-file: .nvmrc
+          cache: 'npm'
+      - run: npm ci
+      - run: npx jest tests/tooling --ci --runInBand
+
+  check:
+    name: fmt, clippy and tests
+    needs: syntax
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions-rust-lang/setup-rust-toolchain@v1
+        with:
+          toolchain: ${{ env.RUST_VERSION }}
+          components: rustfmt, clippy
+
+      - name: Cache cargo registry and build artefacts
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cargo/registry
+            ~/.cargo/git
+            rust/target
+          key: cargo-${{ runner.os }}-${{ env.RUST_VERSION }}-${{ hashFiles('rust/Cargo.lock', 'rust/**/Cargo.toml') }}
+          restore-keys: |
+            cargo-${{ runner.os }}-${{ env.RUST_VERSION }}-
+
+      - name: Format
+        working-directory: rust
+        run: cargo fmt --all --check
+
+      # Warnings are errors: a warning that survives a PR becomes permanent.
+      - name: Clippy
+        working-directory: rust
+        run: cargo clippy --all-targets --all-features -- -D warnings
+
+      - name: Tests
+        working-directory: rust
+        run: cargo test --all-features
+
+      - name: Doctests
+        working-directory: rust
+        run: cargo test --doc
