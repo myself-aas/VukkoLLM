@@ -56,10 +56,12 @@ jobs:
                 cargo "+$tc" clippy --all-targets --all-features -- -D warnings \
                   -A clippy::pedantic > /tmp/clippy.$tc.raw 2>&1
                 clippy=$?
+                # Keep every error/warning *and* the `-->` location line that
+                # follows it: the location is what makes a report actionable.
                 sed -e 's/\x1b\[[0-9;]*m//g' /tmp/clippy.$tc.raw \
-                  | grep -E ': (warning|error):' > /tmp/clippy.$tc.txt
+                  | grep -E '^(error|warning)|^\s+--> ' > /tmp/clippy.$tc.txt
                 echo "clippy exit: $clippy" >> /tmp/report.md
-                echo "findings: $(wc -l < /tmp/clippy.$tc.txt)" >> /tmp/report.md
+                echo "findings: $(grep -cE '^(error|warning)' /tmp/clippy.$tc.txt)" >> /tmp/report.md
                 if [ "$clippy" -ne 0 ] && [ "$(wc -l < /tmp/clippy.$tc.txt)" -eq 0 ]; then
                   tail -6 /tmp/clippy.$tc.raw | sed -e 's/\x1b\[[0-9;]*m//g' >> /tmp/report.md
                 fi
