@@ -94,6 +94,25 @@ jobs:
           echo '```' >> /tmp/report.md
           exit 0
 
+      - name: Capture the fmt diff
+        working-directory: rust
+        run: |
+          set +e
+          cargo fmt --all --check > /tmp/fmt.check 2>&1
+          echo "check exit: $?" > /tmp/fmt.md
+          cargo fmt --all
+          echo '```diff' >> /tmp/fmt.md
+          git -c core.pager=cat diff --no-color -- . >> /tmp/fmt.md
+          echo '```' >> /tmp/fmt.md
+          wc -l /tmp/fmt.md
+
+      - name: Post the fmt diff alone
+        if: always()
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          PR: ${{ github.event.pull_request.number }}
+        run: gh pr comment "$PR" --body-file /tmp/fmt.md --repo "$GITHUB_REPOSITORY"
+
       - name: Post the report on the pull request
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
