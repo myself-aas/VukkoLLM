@@ -94,6 +94,34 @@ jobs:
           echo '```' >> /tmp/report.md
           exit 0
 
+      - name: Collect test results
+        working-directory: rust
+        run: |
+          set +e
+          cargo test --all-features --no-fail-fast > /tmp/tests.raw 2>&1
+          status=$?
+          sed -e 's/\x1b\[[0-9;]*m//g' /tmp/tests.raw > /tmp/tests.txt
+          {
+            echo "cargo test exit: $status"
+            echo '```'
+            grep -E '^(test |failures:|error|---- )' /tmp/tests.txt | head -120
+            echo '```'
+          } > /tmp/tests.md
+          # A failing assertion's message lives after its `---- name stdout ----`
+          echo 'First failure detail:' >> /tmp/tests.md
+          echo '```' >> /tmp/tests.md
+          awk '/^---- .* stdout ----/{flag=1} flag{print} /^$/{if(flag) count++} count>6{exit}' /tmp/tests.txt \
+            | head -60 >> /tmp/tests.md
+          echo '```' >> /tmp/tests.md
+          exit 0
+
+      - name: Post test results
+        if: always()
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          PR: ${{ github.event.pull_request.number }}
+        run: gh pr comment "$PR" --body-file /tmp/tests.md --repo "$GITHUB_REPOSITORY"
+
       - name: Capture the fmt diff
         working-directory: rust
         run: |
