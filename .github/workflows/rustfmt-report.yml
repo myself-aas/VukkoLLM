@@ -1,0 +1,42 @@
+name: rustfmt report
+
+# Temporary diagnostic, deleted once the tree is formatted.
+#
+# This repository is maintained from an environment without a Rust toolchain,
+# so `cargo fmt --all --check` cannot be run before a push. Rather than commit
+# Rust that has never been formatted and guess at the diff, this workflow runs
+# the pinned rustfmt and prints it into the job page, where it can be pasted
+# back. The real gate stays in rust.yml; this file never reports success on
+# unformatted code, it only makes the diff readable.
+
+on:
+  workflow_dispatch:
+
+jobs:
+  report:
+    name: Print the formatting diff
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+
+      # No `toolchain:` input: rust/rust-toolchain.toml is authoritative.
+      - uses: actions-rust-lang/setup-rust-toolchain@v1
+        with:
+          components: rustfmt
+
+      - name: Show the diff cargo fmt wants
+        working-directory: rust
+        run: |
+          set +e
+          rustc --version
+          cargo fmt --all --check
+          status=$?
+          echo "rustfmt exit: $status"
+          # Rewrite in the workspace and print the unified diff instead.
+          cargo fmt --all
+          git -c core.pager=cat diff --no-color --stat
+          echo '=====BEGIN_PATCH====='
+          git -c core.pager=cat diff --no-color
+          echo '=====END_PATCH====='
+          exit 0
