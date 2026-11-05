@@ -197,7 +197,7 @@ pub struct ChatCompletionRequest {
     pub attachments: Vec<RequestAttachment>,
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct ProviderMessage {
     pub role: String,
@@ -205,7 +205,7 @@ pub struct ProviderMessage {
 }
 
 /// An attachment ready to send: bytes inlined as a data URI.
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct RequestAttachment {
     pub name: String,
