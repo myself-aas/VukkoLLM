@@ -74,6 +74,11 @@ yarn-error.log
 .env
 .env.*
 !.env.example
+
+# The Node version is part of the build contract: every workflow reads .nvmrc
+# through `setup-node`, which fails the job outright when the file is absent.
+# Ignoring a file that CI requires is how ten green-looking workflows become
+# ten setup failures, so it is tracked.
 .nvmrc
 
 release/

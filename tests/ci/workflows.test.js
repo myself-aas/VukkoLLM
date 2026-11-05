@@ -10,6 +10,9 @@
 
 const { readdirSync, readFileSync } = require('fs');
 const { join } = require('path');
+const { execFileSync } = require('child_process');
+
+const ROOT = join(__dirname, '..', '..');
 
 const WORKFLOWS = join(__dirname, '..', '..', '.github', 'workflows');
 
@@ -49,6 +52,37 @@ describe('the workflow set', () => {
   test('every workflow can be run by hand, for a re-check after a flake', () => {
     const missing = REQUIRED.filter((name) => !/workflow_dispatch/.test(read(name)));
     expect(missing).toEqual([]);
+  });
+});
+
+describe('the toolchain every workflow needs', () => {
+  test('the Node version file every workflow reads is committed', () => {
+    // `setup-node` fails the whole job when `node-version-file` is missing, and
+    // the failure happens before any step of ours runs: ten red checks that say
+    // nothing about the code. A file that exists locally but is git-ignored
+    // looks present to every local test and is absent on a runner.
+    const pinned = REQUIRED.concat(['translations.yml']).filter((name) =>
+      /node-version-file:\s*\S+/.test(read(name)),
+    );
+    expect(pinned.length).toBeGreaterThan(0);
+
+    for (const name of pinned) {
+      const match = /node-version-file:\s*(\S+)/.exec(read(name));
+      const file = match[1];
+      const tracked = execFileSync('git', ['ls-files', '--error-unmatch', file], {
+        cwd: ROOT,
+        encoding: 'utf8',
+        stdio: ['ignore', 'pipe', 'ignore'],
+      });
+      expect(`${file} is tracked: ${tracked.trim() === file}`).toBe(`${file} is tracked: true`);
+    }
+  });
+
+  test('the pinned Node version satisfies the engine the package declares', () => {
+    const pinned = readFileSync(join(ROOT, '.nvmrc'), 'utf8').trim();
+    const { engines } = JSON.parse(readFileSync(join(ROOT, 'package.json'), 'utf8'));
+    const minimum = Number(/>=([0-9]+)/.exec(engines.node)[1]);
+    expect(Number(pinned.split('.')[0])).toBeGreaterThanOrEqual(minimum);
   });
 });
 
