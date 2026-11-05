@@ -43,10 +43,22 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
+      # No `toolchain:` here on purpose. This action installs *stable* when the
+      # input is omitted, and a rustup toolchain named `stable` wins over
+      # `rust/rust-toolchain.toml` — so `cargo fmt --check` and clippy -D
+      # warnings would silently run on the wrong compiler. The pinned file is
+      # the single source of truth, and the first step below proves it took.
       - uses: actions-rust-lang/setup-rust-toolchain@v1
         with:
-          toolchain: ${{ env.RUST_VERSION }}
           components: rustfmt, clippy
+
+      - name: Assert the pinned toolchain is the one in use
+        working-directory: rust
+        run: |
+          pinned=$(sed -n 's/^channel = "\(.*\)"/\1/p' rust-toolchain.toml)
+          active=$(rustc --version | cut -d' ' -f2)
+          echo "pinned=$pinned active=$active"
+          test "$pinned" = "$active"
 
       - name: Cache cargo registry and build artefacts
         uses: actions/cache@v4
@@ -61,7 +73,14 @@ jobs:
 
       - name: Format
         working-directory: rust
-        run: cargo fmt --all --check
+        run: |
+          # On failure, print the diff rustfmt wants: a bare "failed to run
+          # rustfmt" tells a contributor nothing about what to change.
+          if ! cargo fmt --all --check; then
+            cargo fmt --all
+            git -c core.pager=cat diff --no-color
+            exit 1
+          fi
 
       # Warnings are errors: a warning that survives a PR becomes permanent.
       - name: Clippy

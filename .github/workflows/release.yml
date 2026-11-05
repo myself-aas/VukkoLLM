@@ -24,10 +24,8 @@ jobs:
         with:
           distribution: temurin
           java-version: '17'
+      # Toolchain and targets come from rust/rust-toolchain.toml.
       - uses: actions-rust-lang/setup-rust-toolchain@v1
-        with:
-          toolchain: 1.79.0
-          target: aarch64-linux-android, armv7-linux-androideabi
 
       - name: Cache Gradle
         uses: actions/cache@v4

@@ -2,15 +2,19 @@ name: rustfmt report
 
 # Temporary diagnostic, deleted once the tree is formatted.
 #
-# This repository is maintained from an environment without a Rust toolchain,
-# so `cargo fmt --all --check` cannot be run before a push. Rather than commit
-# Rust that has never been formatted and guess at the diff, this workflow runs
-# the pinned rustfmt and prints it into the job page, where it can be pasted
-# back. The real gate stays in rust.yml; this file never reports success on
-# unformatted code, it only makes the diff readable.
+# This repository is maintained from an environment without a Rust toolchain and
+# static.rust-lang.org is unreachable there, so `cargo fmt --all --check` cannot
+# be run before a push. Rather than commit Rust that has never been formatted
+# and guess at the diff, this workflow runs the pinned rustfmt and posts the
+# diff it wants as a pull-request comment. The real gate stays in rust.yml; this
+# file cannot make unformatted code pass, it only makes the diff readable.
 
 on:
-  workflow_dispatch:
+  pull_request:
+
+permissions:
+  contents: read
+  pull-requests: write
 
 jobs:
   report:
@@ -25,18 +29,34 @@ jobs:
         with:
           components: rustfmt
 
-      - name: Show the diff cargo fmt wants
+      - name: Collect the diff cargo fmt wants
         working-directory: rust
         run: |
           set +e
-          rustc --version
-          cargo fmt --all --check
-          status=$?
-          echo "rustfmt exit: $status"
-          # Rewrite in the workspace and print the unified diff instead.
+          rustc --version > /tmp/rustc.txt
+          cargo fmt --all --check > /tmp/check.txt 2>&1
+          echo "rustfmt check exit: $?" >> /tmp/check.txt
           cargo fmt --all
-          git -c core.pager=cat diff --no-color --stat
-          echo '=====BEGIN_PATCH====='
-          git -c core.pager=cat diff --no-color
-          echo '=====END_PATCH====='
+          git -c core.pager=cat diff --no-color > /tmp/fmt.patch
+          wc -l /tmp/fmt.patch
           exit 0
+
+      - name: Post the diff on the pull request
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          PR: ${{ github.event.pull_request.number }}
+        run: |
+          {
+            echo 'Rust formatting report (temporary workflow, safe to delete).'
+            echo
+            echo '```'
+            cat /tmp/rustc.txt /tmp/check.txt
+            echo '```'
+            echo
+            echo 'Diff `cargo fmt --all` wants:'
+            echo
+            echo '```diff'
+            cat /tmp/fmt.patch
+            echo '```'
+          } > /tmp/body.md
+          gh pr comment "$PR" --body-file /tmp/body.md --repo "$GITHUB_REPOSITORY"

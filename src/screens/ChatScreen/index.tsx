@@ -317,14 +317,18 @@ export function ChatScreen({
         ListEmptyComponent={
           <EmptyChatState
             workspaceName={store.workspace?.name ?? 'Vukko'}
-            onQuickAction={(action) => void send(String(action))}
+            onQuickAction={(action) => {
+              void send(String(action));
+            }}
           />
         }
         contentContainerStyle={styles.list}
       />
 
       <PromptInputBar
-        onSend={(prompt) => void send(prompt)}
+        onSend={(prompt) => {
+          void send(prompt);
+        }}
         onCancel={() => {
           if (store.activeRequestId) void chatService.cancel(store.activeRequestId);
         }}
@@ -338,7 +342,9 @@ export function ChatScreen({
         threads={store.threads}
         activeWorkspaceId={store.workspace?.id ?? null}
         activeThreadId={store.activeThreadId}
-        onSelectWorkspace={(workspaceId) => void openWorkspace(workspaceId)}
+        onSelectWorkspace={(workspaceId) => {
+          void openWorkspace(workspaceId);
+        }}
         onSelectThread={(threadId) => {
           store.setActiveThread(threadId);
           setDrawerOpen(false);
@@ -370,8 +376,16 @@ export function ChatScreen({
         visible={settingsOpen}
         biometricLockEnabled={appLock ? biometricLock.enabled : undefined}
         biometricLockError={biometricLock.error}
-        onToggleBiometricLock={appLock ? (enabled) => void toggleBiometricLock(enabled) : undefined}
-        onOpenStorage={() => void openStorage()}
+        onToggleBiometricLock={
+          appLock
+            ? (enabled) => {
+                void toggleBiometricLock(enabled);
+              }
+            : undefined
+        }
+        onOpenStorage={() => {
+          void openStorage();
+        }}
         onOpenGitHub={() => {
           setSettingsOpen(false);
           setGithubOpen(true);
@@ -392,7 +406,12 @@ export function ChatScreen({
             {storage.stats ? (
               <StorageInspector stats={storage.stats} integrity={storage.integrity} />
             ) : storage.error ? (
-              <ErrorState error={storage.error} onRetry={() => void openStorage()} />
+              <ErrorState
+                error={storage.error}
+                onRetry={() => {
+                  void openStorage();
+                }}
+              />
             ) : (
               <Text style={styles.modalLoading}>Reading storage…</Text>
             )}

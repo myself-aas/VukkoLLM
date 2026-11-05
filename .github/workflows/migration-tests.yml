@@ -34,19 +34,25 @@ jobs:
         run: npx jest tests/migration tests/repository tests/contracts --ci --runInBand
 
       # The Rust runner executes the same SQL; CI is where it is compiled.
+      # Toolchain comes from rust/rust-toolchain.toml; see rust.yml for why the
+      # action must not be given a name that shadows it.
       - uses: actions-rust-lang/setup-rust-toolchain@v1
-        with:
-          toolchain: 1.79.0
 
       - name: Rust migration tests
         working-directory: rust
         run: cargo test -p vukko-db --all-features
 
+      # `scripts/build-fixtures.cjs` writes into `fixtures/out/`. Pointing at
+      # `fixtures/*.db` matched nothing, and `if-no-files-found: ignore` made the
+      # empty upload invisible — the one artifact meant to explain a failure was
+      # never captured.
       - name: Upload the fixture database on failure
         if: failure()
         uses: actions/upload-artifact@v4
         with:
           name: legacy-fixtures
-          path: tests/migration/fixtures/*.db
-          if-no-files-found: ignore
+          path: |
+            tests/migration/fixtures/out/*.db
+            rust/target/debug/**/*.db
+          if-no-files-found: error
           retention-days: 7
