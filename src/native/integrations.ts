@@ -127,9 +127,7 @@ export async function saveSessionPreferences(
   }
 }
 
-export async function loadSessionPreferences(
-  store: PreferenceStore,
-): Promise<SessionPreferences> {
+export async function loadSessionPreferences(store: PreferenceStore): Promise<SessionPreferences> {
   const read = (name: string) => store.get(`${PREFERENCE_PREFIX}${name}`);
   const boolean = (name: string) => {
     const value = read(name);
@@ -255,13 +253,7 @@ export function createSecureStorage(options: {
 
 // --------------------------------------------------------- Step 7.3 files
 
-export type ImportKind =
-  | 'PDF'
-  | 'MARKDOWN'
-  | 'TEXT'
-  | 'IMAGE'
-  | 'WEB_LINK'
-  | 'UNSUPPORTED';
+export type ImportKind = 'PDF' | 'MARKDOWN' | 'TEXT' | 'IMAGE' | 'WEB_LINK' | 'UNSUPPORTED';
 
 export interface ImportCandidate {
   name: string;
