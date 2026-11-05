@@ -12,10 +12,10 @@ use super::chat::Timestamp;
 #[allow(clippy::upper_case_acronyms, non_camel_case_types)]
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 pub enum PRState {
-// The variants are already upper case, and `rename_all` would re-case the
-// *identifier* — NOT_FOUND serialises as N_O_T__F_O_U_N_D — which would break
-// every persisted value. An explicit rename is a no-op for Rust and a contract
-// for the wire, so the shape cannot drift with a serde default.
+    // The variants are already upper case, and `rename_all` would re-case the
+    // *identifier* — NOT_FOUND serialises as N_O_T__F_O_U_N_D — which would break
+    // every persisted value. An explicit rename is a no-op for Rust and a contract
+    // for the wire, so the shape cannot drift with a serde default.
     #[serde(rename = "OPEN")]
     OPEN,
     #[serde(rename = "CLOSED")]
@@ -98,10 +98,10 @@ pub struct GitHubUserProfile {
 )]
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 pub enum GitHubAuthStatus {
-// The variants are already upper case, and `rename_all` would re-case the
-// *identifier* — NOT_FOUND serialises as N_O_T__F_O_U_N_D — which would break
-// every persisted value. An explicit rename is a no-op for Rust and a contract
-// for the wire, so the shape cannot drift with a serde default.
+    // The variants are already upper case, and `rename_all` would re-case the
+    // *identifier* — NOT_FOUND serialises as N_O_T__F_O_U_N_D — which would break
+    // every persisted value. An explicit rename is a no-op for Rust and a contract
+    // for the wire, so the shape cannot drift with a serde default.
     #[serde(rename = "UNLINKED")]
     UNLINKED,
     #[serde(rename = "REQUESTING_CODE")]

@@ -16,10 +16,10 @@ pub type Timestamp = i64;
 #[allow(clippy::upper_case_acronyms, non_camel_case_types)]
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 pub enum MessageSender {
-// The variants are already upper case, and `rename_all` would re-case the
-// *identifier* — NOT_FOUND serialises as N_O_T__F_O_U_N_D — which would break
-// every persisted value. An explicit rename is a no-op for Rust and a contract
-// for the wire, so the shape cannot drift with a serde default.
+    // The variants are already upper case, and `rename_all` would re-case the
+    // *identifier* — NOT_FOUND serialises as N_O_T__F_O_U_N_D — which would break
+    // every persisted value. An explicit rename is a no-op for Rust and a contract
+    // for the wire, so the shape cannot drift with a serde default.
     #[serde(rename = "USER")]
     USER,
     #[serde(rename = "ASSISTANT")]
@@ -53,10 +53,10 @@ impl MessageSender {
 #[allow(clippy::upper_case_acronyms, non_camel_case_types)]
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 pub enum AgentStepStatus {
-// The variants are already upper case, and `rename_all` would re-case the
-// *identifier* — NOT_FOUND serialises as N_O_T__F_O_U_N_D — which would break
-// every persisted value. An explicit rename is a no-op for Rust and a contract
-// for the wire, so the shape cannot drift with a serde default.
+    // The variants are already upper case, and `rename_all` would re-case the
+    // *identifier* — NOT_FOUND serialises as N_O_T__F_O_U_N_D — which would break
+    // every persisted value. An explicit rename is a no-op for Rust and a contract
+    // for the wire, so the shape cannot drift with a serde default.
     #[serde(rename = "PENDING")]
     PENDING,
     #[serde(rename = "RUNNING")]

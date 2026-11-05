@@ -27,10 +27,10 @@ use serde::{Deserialize, Serialize};
 )]
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 pub enum ErrorCode {
-// The variants are already upper case, and `rename_all` would re-case the
-// *identifier* — NOT_FOUND serialises as N_O_T__F_O_U_N_D — which would break
-// every persisted value. An explicit rename is a no-op for Rust and a contract
-// for the wire, so the shape cannot drift with a serde default.
+    // The variants are already upper case, and `rename_all` would re-case the
+    // *identifier* — NOT_FOUND serialises as N_O_T__F_O_U_N_D — which would break
+    // every persisted value. An explicit rename is a no-op for Rust and a contract
+    // for the wire, so the shape cannot drift with a serde default.
     #[serde(rename = "NOT_INITIALIZED")]
     NOT_INITIALIZED,
     #[serde(rename = "NOT_FOUND")]
