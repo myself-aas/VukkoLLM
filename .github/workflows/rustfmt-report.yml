@@ -43,9 +43,13 @@ jobs:
             echo '=== cargo clippy -- -D warnings (grouped) ==='
           } > /tmp/report.md
 
-          cargo clippy --all-targets --all-features --message-format=short 2>&1 \
-            | grep -E '^(crates|warning|error)' > /tmp/clippy.txt
-          echo "clippy exit: $?" >> /tmp/report.md
+          # `--message-format=short` prints one line per finding, with an
+          # absolute path: match the ": warning:" / ": error:" marker, not a
+          # leading directory name.
+          cargo clippy --all-targets --all-features --message-format=short > /tmp/clippy.raw 2>&1
+          clippy_status=$?
+          grep -E ': (warning|error):' /tmp/clippy.raw > /tmp/clippy.txt
+          echo "clippy exit: $clippy_status" >> /tmp/report.md
           echo '```' >> /tmp/report.md
           echo "total findings: $(wc -l < /tmp/clippy.txt)" >> /tmp/report.md
           # One line per distinct lint, with its count and first location.
@@ -59,6 +63,12 @@ jobs:
             name=$(echo "$lint" | tr -d '[]')
             grep -m1 -F "$lint" /tmp/clippy.txt >> /tmp/report.md
           done < /tmp/lints.txt
+          echo '```' >> /tmp/report.md
+          # Anything clippy printed that is not a finding (a build failure, a
+          # missing dependency) is the reason the gate would fail, so keep it.
+          echo 'Last lines of raw output:' >> /tmp/report.md
+          echo '```' >> /tmp/report.md
+          tail -15 /tmp/clippy.raw >> /tmp/report.md
           echo '```' >> /tmp/report.md
           exit 0
 
