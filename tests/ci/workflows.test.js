@@ -127,3 +127,37 @@ describe('caching', () => {
     expect(keys.length).toBeGreaterThan(0);
   });
 });
+
+describe('the packaging contract', () => {
+  const read = (path) => readFileSync(join(__dirname, '..', '..', path), 'utf8');
+
+  test('the Rust toolchain is pinned in one place the workflow agrees with', () => {
+    const toolchain = read('rust/rust-toolchain.toml');
+    const workflow = read('.github/workflows/rust.yml');
+    const pinned = /channel = "(\d+\.\d+\.\d+)"/.exec(toolchain)?.[1];
+    expect(pinned).toBeTruthy();
+    expect(workflow).toContain(`RUST_VERSION: ${pinned}`);
+  });
+
+  test('the packaging guide names every target the plan requires', () => {
+    const guide = read('rust/README.md');
+    for (const target of [
+      'aarch64-linux-android',
+      'armv7-linux-androideabi',
+      'x86_64-linux-android',
+      'aarch64-apple-ios',
+      'aarch64-apple-ios-sim',
+    ]) {
+      expect(`${target}: ${guide.includes(target)}`).toBe(`${target}: true`);
+    }
+    expect(guide).toMatch(/jniLibs/);
+    expect(guide).toMatch(/XCFramework/);
+  });
+
+  test('the workspace crates match the documented layout', () => {
+    const workspace = read('rust/Cargo.toml');
+    for (const member of ['vukko-core', 'vukko-db', 'vukko-bridge']) {
+      expect(workspace).toContain(`crates/${member}`);
+    }
+  });
+});

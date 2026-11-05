@@ -1,4 +1,12 @@
+# Pinned so every machine and CI build produce the same shipped library.
+# Bump deliberately, together with RUST_VERSION in .github/workflows/rust.yml.
 [toolchain]
-channel = "1.83.0"
+channel = "1.79.0"
 components = ["rustfmt", "clippy"]
-profile = "minimal"
+targets = [
+  "aarch64-linux-android",
+  "armv7-linux-androideabi",
+  "x86_64-linux-android",
+  "aarch64-apple-ios",
+  "aarch64-apple-ios-sim",
+]
