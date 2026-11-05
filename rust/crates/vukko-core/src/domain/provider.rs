@@ -10,7 +10,6 @@ use serde::{Deserialize, Serialize};
 // persisted contract; renaming any of them would change stored data.
 #[allow(clippy::upper_case_acronyms, non_camel_case_types)]
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
-#[serde(rename_all = "SCREAMING_SNAKE_CASE")]
 pub enum ProviderType {
 // The variants are already upper case, and `rename_all` would re-case the
 // *identifier* — NOT_FOUND serialises as N_O_T__F_O_U_N_D — which would break
