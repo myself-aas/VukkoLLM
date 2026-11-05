@@ -86,13 +86,12 @@ impl Engine {
     pub fn open(path: impl AsRef<Path>) -> Result<Self, BridgeError> {
         let path = path.as_ref().to_path_buf();
         let (mut conn, adoption) = vukko_db::adopt(&path)?;
-        // Seeding happens once, on a fresh install. A count that is thrown away
-        // is a count nobody can explain later, so it is logged rather than
-        // discarded: a non-zero value says where the default workspace came
-        // from, and a zero on a database that should be new is a symptom.
+        // Seeding happens once, on a fresh install, and the result used to be
+        // discarded: `true` is the only record of where the default workspace
+        // came from, so it is put in the log instead of dropped on the floor.
         let seeded = bootstrap::seed_if_empty(&mut conn).map_err(BridgeError::from)?;
-        if seeded > 0 {
-            tracing::info!(seeded, "seeded a fresh database");
+        if seeded {
+            tracing::info!("seeded a fresh database");
         }
 
         Ok(Self {
