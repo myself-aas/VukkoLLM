@@ -185,7 +185,7 @@ pub fn descriptor(provider: ProviderType) -> &'static ProviderDescriptor {
 }
 
 /// One logical chat request, independent of provider.
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct ChatCompletionRequest {
     pub model: String,

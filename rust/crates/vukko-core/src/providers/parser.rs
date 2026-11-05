@@ -5,7 +5,9 @@
 //! a network. A payload that fails to parse yields a `NETWORK` error rather than
 //! ending the stream silently, so a truncated response is visible.
 
-use crate::domain::{Citation, ErrorCode, ProviderError};
+use crate::domain::{Citation, ErrorCode};
+
+use super::ProviderError;
 
 use super::{Protocol, ProviderChunk};
 

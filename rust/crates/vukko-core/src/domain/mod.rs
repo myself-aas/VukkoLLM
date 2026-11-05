@@ -4,6 +4,7 @@
 //! field-for-field; `tests/contracts/parity.test.js` fails when they drift.
 
 pub mod agent;
+pub mod backup;
 pub mod chat;
 pub mod document;
 pub mod error;
@@ -12,6 +13,7 @@ pub mod provider;
 pub mod storage;
 pub mod workspace;
 
+pub use backup::{BackupResult, BackupSettings, BackupStatus, BackupTarget, BackupTrigger};
 pub use chat::{
     AgentStep, AgentStepStatus, ChatMessage, Citation, MessageAttachment, MessageSender, Timestamp,
     ToolCall,

@@ -11,6 +11,9 @@ use serde::{Deserialize, Serialize};
 /// in a JavaScript safe integer by the bridge before they are handed to JS.
 pub type Timestamp = i64;
 
+// Variant names are the Kotlin enum names and the serde wire values are the
+// persisted contract; renaming any of them would change stored data.
+#[allow(clippy::upper_case_acronyms, non_camel_case_types)]
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "SCREAMING_SNAKE_CASE")]
 pub enum MessageSender {
@@ -39,6 +42,9 @@ impl MessageSender {
     }
 }
 
+// Variant names are the Kotlin enum names and the serde wire values are the
+// persisted contract; renaming any of them would change stored data.
+#[allow(clippy::upper_case_acronyms, non_camel_case_types)]
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "SCREAMING_SNAKE_CASE")]
 pub enum AgentStepStatus {

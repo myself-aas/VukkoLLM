@@ -23,7 +23,7 @@ use serde::Deserialize;
 use serde_json::json;
 
 use crate::domain::{
-    ErrorCode, GitHubBranch, GitHubCommit, GitHubDeviceCode, GitHubPullRequest, GitHubRepository,
+    GitHubBranch, GitHubCommit, GitHubDeviceCode, GitHubPullRequest, GitHubRepository,
     GitHubUserProfile, VukkoError,
 };
 use crate::providers::ProviderError;
@@ -755,6 +755,8 @@ impl GitHubService for DemoGitHubService {
 
 #[cfg(test)]
 mod tests {
+    use crate::domain::ErrorCode;
+
     use super::*;
     /// Records the verb and replays one canned response.
     pub struct FakeGitHubTransport {

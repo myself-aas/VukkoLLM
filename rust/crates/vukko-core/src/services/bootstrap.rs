@@ -11,7 +11,7 @@
 use rusqlite::Connection;
 
 use crate::domain::{Citation, QueryMode, VukkoError, Workspace};
-use crate::repository::{message_repository, workspace_repository};
+use crate::repository::message_repository;
 
 /// Timestamp base for seeded rows: the seed is historical, not "now", so a
 /// re-seed on a second device sorts identically.

@@ -58,6 +58,13 @@ pub struct IntegrityCheckResult {
 }
 
 /// Who owns the on-disk schema right now.
+// Variant names are the Kotlin enum names, and the serde wire values are
+// part of the persisted contract; renaming any of them changes stored data.
+#[allow(
+    clippy::upper_case_acronyms,
+    clippy::enum_variant_names,
+    non_camel_case_types
+)]
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "SCREAMING_SNAKE_CASE")]
 pub enum SchemaOwnership {

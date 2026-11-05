@@ -57,7 +57,11 @@ pub fn run_integrity_check(
 
     let mut table_counts = Vec::with_capacity(COUNTED_TABLES.len());
     for table in COUNTED_TABLES {
-        if !vukko_db::table_exists(conn, table)? {
+        // `table_exists` reports a `DbError`; the repository layer speaks
+        // `VukkoError`, and a missing table is a storage problem either way.
+        let exists = vukko_db::table_exists(conn, table)
+            .map_err(|error| VukkoError::storage(error.to_string()))?;
+        if !exists {
             table_counts.push(TableCount {
                 table: (*table).to_string(),
                 rows: 0,
