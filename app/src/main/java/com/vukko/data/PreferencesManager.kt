@@ -4,8 +4,38 @@ import android.content.Context
 import android.content.SharedPreferences
 import com.vukko.model.ProviderType
 
+/**
+ * Non-secret user settings.
+ *
+ * Credentials (provider API keys, the instance key, GitHub tokens, device
+ * codes and SSH keys) deliberately do NOT live here any more: SharedPreferences
+ * is plaintext on disk and included in `allowBackup` transfers. They are read
+ * and written through [SecurePreferencesManager], which keeps them encrypted
+ * with an Android Keystore key. The accessors below are kept so existing
+ * callers keep compiling and so an encrypted value is migrated out of the old
+ * plaintext slot on first read.
+ */
 class PreferencesManager(context: Context) {
     private val prefs: SharedPreferences = context.getSharedPreferences("vukko_prefs", Context.MODE_PRIVATE)
+    private val secure = SecurePreferencesManager(context.applicationContext)
+
+    /**
+     * Reads a secret from secure storage. A value still sitting in the old
+     * plaintext slot (installs upgrading from a pre-1.1 build) is moved into
+     * encrypted storage and deleted from the plaintext file.
+     */
+    private fun readSecret(name: String): String {
+        val legacy = prefs.getString(name, null)
+        if (legacy.isNullOrEmpty()) return secure.getSecret(name)
+        secure.setSecret(name, legacy)
+        prefs.edit().remove(name).apply()
+        return legacy
+    }
+
+    private fun writeSecret(name: String, value: String) {
+        secure.setSecret(name, value)
+        prefs.edit().remove(name).apply()
+    }
 
     var activeWorkspaceId: String
         get() = prefs.getString("active_workspace_id", "ws_default") ?: "ws_default"
@@ -27,11 +57,11 @@ class PreferencesManager(context: Context) {
         set(value) = prefs.edit().putString("selected_model_id", value).apply()
 
     fun getApiKey(provider: ProviderType): String {
-        return prefs.getString("api_key_${provider.name}", "") ?: ""
+        return readSecret(SecurePreferencesManager.apiKeyName(provider))
     }
 
     fun setApiKey(provider: ProviderType, key: String) {
-        prefs.edit().putString("api_key_${provider.name}", key).apply()
+        writeSecret(SecurePreferencesManager.apiKeyName(provider), key)
     }
 
     var instanceUrl: String
@@ -39,8 +69,8 @@ class PreferencesManager(context: Context) {
         set(value) = prefs.edit().putString("instance_url", value).apply()
 
     var instanceApiKey: String
-        get() = prefs.getString("instance_api_key", "") ?: ""
-        set(value) = prefs.edit().putString("instance_api_key", value).apply()
+        get() = readSecret(SecurePreferencesManager.INSTANCE_API_KEY)
+        set(value) = writeSecret(SecurePreferencesManager.INSTANCE_API_KEY, value)
 
     var webSearchEnabled: Boolean
         get() = prefs.getBoolean("tool_web_search", true)
@@ -51,8 +81,8 @@ class PreferencesManager(context: Context) {
         set(value) = prefs.edit().putBoolean("tool_auto_approve", value).apply()
 
     var githubToken: String
-        get() = prefs.getString("github_token", "") ?: ""
-        set(value) = prefs.edit().putString("github_token", value).apply()
+        get() = readSecret(SecurePreferencesManager.GITHUB_TOKEN)
+        set(value) = writeSecret(SecurePreferencesManager.GITHUB_TOKEN, value)
 
     var githubUsername: String
         get() = prefs.getString("github_username", "") ?: ""
@@ -71,16 +101,16 @@ class PreferencesManager(context: Context) {
         set(value) = prefs.edit().putBoolean("github_oauth_connected", value).apply()
 
     var githubDeviceCode: String
-        get() = prefs.getString("github_device_code", "") ?: ""
-        set(value) = prefs.edit().putString("github_device_code", value).apply()
+        get() = readSecret(SecurePreferencesManager.GITHUB_DEVICE_CODE)
+        set(value) = writeSecret(SecurePreferencesManager.GITHUB_DEVICE_CODE, value)
 
     var githubUserCode: String
-        get() = prefs.getString("github_user_code", "") ?: ""
-        set(value) = prefs.edit().putString("github_user_code", value).apply()
+        get() = readSecret(SecurePreferencesManager.GITHUB_USER_CODE)
+        set(value) = writeSecret(SecurePreferencesManager.GITHUB_USER_CODE, value)
 
     var githubSshKey: String
-        get() = prefs.getString("github_ssh_key", "") ?: ""
-        set(value) = prefs.edit().putString("github_ssh_key", value).apply()
+        get() = readSecret(SecurePreferencesManager.GITHUB_SSH_KEY)
+        set(value) = writeSecret(SecurePreferencesManager.GITHUB_SSH_KEY, value)
 
     var githubAuthMode: String
         get() = prefs.getString("github_auth_mode", "oauth") ?: "oauth"

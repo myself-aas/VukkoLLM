@@ -41,3 +41,19 @@ AnythingLLM is the all-in-one AI client and workspace assistant application, rew
 - **Architecture**: MVVM with Repository Pattern, Kotlin Coroutines, & reactive StateFlow
 - **Typography**: Plus Jakarta Sans (bundled locally in `res/font/`)
 - **Theme**: Signature AnythingLLM Dark Theme (`#131314` obsidian background with Cyan `#06B6D4` accents)
+
+## Repository status
+
+This repository is mid-migration from Kotlin/Jetpack Compose to React Native +
+Rust. Practical entry points:
+
+- [`MIGRATION_PLAN.md`](MIGRATION_PLAN.md) — the staged plan.
+- [`docs/FEATURE_MATRIX.md`](docs/FEATURE_MATRIX.md) — every Kotlin surface and its replacement.
+- [`docs/INVARIANTS.md`](docs/INVARIANTS.md) — behaviour that must not regress, and the test that enforces it.
+- [`docs/RUST_VERIFICATION.md`](docs/RUST_VERIFICATION.md) — what is verified locally vs. in CI.
+
+```bash
+npm install          # JS/TS toolchain (React Native 0.81, Jest, TypeScript)
+npm test             # all Jest suites (baseline, migration, provider, UI)
+npm run typecheck    # tsc --noEmit
+```

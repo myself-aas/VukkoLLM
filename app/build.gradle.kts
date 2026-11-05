@@ -56,6 +56,12 @@ android {
     }
 }
 
+// Room exports a schema JSON per version so migrations (Kotlin today, Rust from
+// Phase 3) are tested against the real DDL instead of a reconstruction.
+ksp {
+    arg("room.schemaLocation", "$projectDir/schemas")
+}
+
 dependencies {
     implementation(libs.androidx.core.ktx)
     implementation(libs.androidx.lifecycle.runtime.ktx)
