@@ -1,10 +1,14 @@
-name: "CLA Assistant"
+name: 'CLA Assistant'
 
 on:
   issue_comment:
     types: [created]
   pull_request_target:
     types: [opened, closed, synchronize]
+  # Only runs when the signing phrase is commented: this workflow used the same
+  # `pull_request_target` trigger to *require* a CLA on every PR, and the
+  # document it points at is a third-party repository (Mintplex-Labs), inherited
+  # from the template. Vukko's CLA.md is the one that applies here.
 
 permissions:
   actions: write
@@ -16,14 +20,14 @@ jobs:
   cla:
     runs-on: ubuntu-latest
     steps:
-      - name: "CLA Assistant"
-        if: (github.event.comment.body == 'recheck' || github.event.comment.body == 'I have read the CLA Document and I hereby sign the CLA') || github.event_name == 'pull_request_target'
+      - name: 'CLA Assistant'
+        if: github.event_name == 'issue_comment' && (github.event.comment.body == 'recheck' || github.event.comment.body == 'I have read the CLA Document and I hereby sign the CLA')
         uses: contributor-assistant/github-action@v2.6.1
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         with:
-          path-to-document: "https://github.com/Mintplex-Labs/anythingllm-mobile/blob/main/CLA.md"
-          path-to-signatures: "signatures/v1/cla.json"
+          path-to-document: 'https://github.com/myself-aas/VukkoLLM/blob/main/CLA.md'
+          path-to-signatures: 'signatures/v1/cla.json'
           # Signatures live on their own branch so branch protection on main doesn't block the bot.
-          branch: "cla-signatures"
+          branch: 'cla-signatures'
           allowlist: myself-aas,timothycarambat,dependabot[bot],*[bot]

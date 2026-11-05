@@ -22,7 +22,9 @@ import com.vukko.data.local.entities.WorkspaceEntity
         WorkspaceDocumentEntity::class
     ],
     version = 1,
-    exportSchema = false
+    // Schema export is what lets the Rust migration be tested against the real
+    // v1 DDL instead of a reconstruction. Output: app/schemas/.
+    exportSchema = true
 )
 @TypeConverters(RoomConverters::class)
 abstract class AppDatabase : RoomDatabase() {
@@ -45,7 +47,10 @@ abstract class AppDatabase : RoomDatabase() {
                     AppDatabase::class.java,
                     DATABASE_NAME
                 )
-                    .fallbackToDestructiveMigration()
+                    // No destructive fallback: destroying user data on a version
+                    // bump is a data-loss bug, not a strategy. Every schema change
+                    // must ship a real Migration (the Rust crates/vukko-db
+                    // migrations are the equivalent going forward).
                     .build()
                 INSTANCE = instance
                 instance

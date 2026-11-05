@@ -1,0 +1,46 @@
+name: ios
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+concurrency:
+  group: ios-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  build:
+    name: iOS build
+    runs-on: macos-14
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version-file: .nvmrc
+          cache: 'npm'
+
+      # Toolchain and targets come from rust/rust-toolchain.toml.
+      - uses: actions-rust-lang/setup-rust-toolchain@v1
+
+      - run: npm ci
+
+      - name: CocoaPods
+        working-directory: ios
+        run: |
+          pod install --repo-update
+
+      - name: xcodebuild (simulator)
+        working-directory: ios
+        run: |
+          xcodebuild \
+            -workspace Vukko.xcworkspace \
+            -scheme Vukko \
+            -configuration Debug \
+            -sdk iphonesimulator \
+            -destination 'generic/platform=iOS Simulator' \
+            CODE_SIGNING_ALLOWED=NO \
+            build

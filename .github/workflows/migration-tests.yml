@@ -1,0 +1,58 @@
+name: migration-tests
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+concurrency:
+  group: migration-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  legacy-fixtures:
+    name: Legacy Room fixtures and adoption
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version-file: .nvmrc
+          cache: 'npm'
+
+      - run: npm ci
+
+      # The fixture database is generated from the legacy schema, so the test
+      # data cannot drift from the schema it claims to represent.
+      - name: Build the legacy Room fixtures
+        run: npm run test:fixtures
+
+      - name: Migration suites (fresh, repeated, corrupted, every version)
+        run: npx jest tests/migration tests/repository tests/contracts --ci --runInBand
+
+      # The Rust runner executes the same SQL; CI is where it is compiled.
+      # Toolchain comes from rust/rust-toolchain.toml; see rust.yml for why the
+      # action must not be given a name that shadows it.
+      - uses: actions-rust-lang/setup-rust-toolchain@v1
+
+      - name: Rust migration tests
+        working-directory: rust
+        run: cargo test -p vukko-db --all-features
+
+      # `scripts/build-fixtures.cjs` writes into `fixtures/out/`. Pointing at
+      # `fixtures/*.db` matched nothing, and `if-no-files-found: ignore` made the
+      # empty upload invisible — the one artifact meant to explain a failure was
+      # never captured.
+      - name: Upload the fixture database on failure
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: legacy-fixtures
+          path: |
+            tests/migration/fixtures/out/*.db
+            rust/target/debug/**/*.db
+          if-no-files-found: error
+          retention-days: 7

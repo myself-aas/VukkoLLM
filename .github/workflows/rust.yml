@@ -1,0 +1,102 @@
+name: rust
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    paths:
+      - 'rust/**'
+      - 'tests/tooling/**'
+      - '.github/workflows/rust.yml'
+  workflow_dispatch:
+
+env:
+  RUST_VERSION: 1.89.0
+  CARGO_TERM_COLOR: always
+
+concurrency:
+  group: rust-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  # Parses every .rs file before cargo runs. A syntax error is reported with the
+  # file and line by the syntax gate; cargo would report it too, but only after
+  # a full toolchain install, and its message points at the macro expansion.
+  syntax:
+    name: Rust syntax gate
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version-file: .nvmrc
+          cache: 'npm'
+      - run: npm ci
+      - run: npx jest tests/tooling --ci --runInBand
+
+  check:
+    name: fmt, clippy and tests
+    needs: syntax
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v4
+
+      # No `toolchain:` here on purpose. This action installs *stable* when the
+      # input is omitted, and a rustup toolchain named `stable` wins over
+      # `rust/rust-toolchain.toml` — so `cargo fmt --check` and clippy -D
+      # warnings would silently run on the wrong compiler. The pinned file is
+      # the single source of truth, and the first step below proves it took.
+      - uses: actions-rust-lang/setup-rust-toolchain@v1
+        with:
+          components: rustfmt, clippy
+
+      - name: Assert the pinned toolchain is the one in use
+        working-directory: rust
+        run: |
+          pinned=$(sed -n 's/^channel = "\(.*\)"/\1/p' rust-toolchain.toml)
+          active=$(rustc --version | cut -d' ' -f2)
+          echo "pinned=$pinned active=$active"
+          test "$pinned" = "$active"
+
+      - name: Cache cargo registry and build artefacts
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cargo/registry
+            ~/.cargo/git
+            rust/target
+          key: cargo-${{ runner.os }}-${{ env.RUST_VERSION }}-${{ hashFiles('rust/Cargo.lock', 'rust/**/Cargo.toml') }}
+          restore-keys: |
+            cargo-${{ runner.os }}-${{ env.RUST_VERSION }}-
+
+      - name: Format
+        working-directory: rust
+        run: |
+          # On failure, print the diff rustfmt wants: a bare "failed to run
+          # rustfmt" tells a contributor nothing about what to change.
+          if ! cargo fmt --all --check; then
+            cargo fmt --all
+            git -c core.pager=cat diff --no-color
+            exit 1
+          fi
+
+      # Warnings are errors: a warning that survives a PR becomes permanent.
+      #
+      # The crate-level `#![allow(clippy::pedantic)]` is what keeps pedantic
+      # advice out of this, and it has to be a source attribute: a command-line
+      # `-A` cannot override `#![warn(...)]` in the crate, so the two would
+      # contradict each other and doc-backtick style would become a build error.
+      # `unwrap_used` is denied only for non-test code, by the same policy.
+      - name: Clippy
+        working-directory: rust
+        run: cargo clippy --all-targets --all-features -- -D warnings
+
+      - name: Tests
+        working-directory: rust
+        run: cargo test --all-features
+
+      - name: Doctests
+        working-directory: rust
+        run: cargo test --doc

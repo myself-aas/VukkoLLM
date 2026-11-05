@@ -42,7 +42,6 @@ android/app/src/main/res/raw
 node_modules/
 npm-debug.log
 yarn-error.log
-package-lock.json
 .yarn
 
 # fastlane
@@ -75,6 +74,11 @@ package-lock.json
 .env
 .env.*
 !.env.example
+
+# The Node version is part of the build contract: every workflow reads .nvmrc
+# through `setup-node`, which fails the job outright when the file is absent.
+# Ignoring a file that CI requires is how ten green-looking workflows become
+# ten setup failures, so it is tracked.
 .nvmrc
 
 release/
@@ -88,3 +92,11 @@ sourcemaps/
 # Licensed brand fonts (Fontshare FFL - no redistribution). See scripts/checkBrandFonts.js
 src/assets/fonts/ClashDisplay-*
 android/app/src/main/assets/fonts/ClashDisplay-*
+
+# Generated migration fixture databases (see scripts/build-fixtures.cjs)
+tests/migration/fixtures/out/
+# Room exported schemas are build output of the Kotlin module until Phase 3
+app/schemas/
+
+# Agent/SDD scratch space
+.superpowers/

@@ -1,0 +1,148 @@
+name: rust diagnostics
+
+# Temporary diagnostic, deleted once the numbers below are zero.
+#
+# This repository is maintained from an environment without a Rust toolchain and
+# static.rust-lang.org is unreachable there, so `cargo fmt` and `cargo clippy`
+# cannot be run before a push. This workflow runs both and posts a compact
+# report as a pull-request comment. The real gates stay in rust.yml; this file
+# cannot make anything pass.
+
+on:
+  pull_request:
+
+permissions:
+  contents: read
+  pull-requests: write
+
+jobs:
+  report:
+    name: Formatting and lints across toolchains
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions-rust-lang/setup-rust-toolchain@v1
+        with:
+          components: rustfmt, clippy
+
+      - name: Collect the report
+        run: |
+          set +e
+          : > /tmp/report.md
+          echo 'Which toolchain can resolve the dependency graph at all?' >> /tmp/report.md
+          echo >> /tmp/report.md
+
+          for tc in 1.89.0; do
+            rustup component add --toolchain "$tc" rustfmt clippy >/dev/null 2>&1
+            {
+              echo "=== $tc ==="
+              echo '```'
+            } >> /tmp/report.md
+
+            if cargo "+$tc" --version >/dev/null 2>&1; then
+              cd rust
+              cargo "+$tc" generate-lockfile >/tmp/lock.$tc.txt 2>&1
+              lock=$?
+              echo "generate-lockfile exit: $lock" >> /tmp/report.md
+              if [ $lock -ne 0 ]; then
+                grep -E 'error|Caused by|requires' /tmp/lock.$tc.txt | head -6 >> /tmp/report.md
+              else
+                fmt=$(cargo "+$tc" fmt --all --check >/dev/null 2>&1; echo $?)
+                echo "fmt exit: $fmt" >> /tmp/report.md
+                # Same flags as the gate in rust.yml, so this report predicts
+                # CI rather than approximating it.
+                cargo "+$tc" clippy --all-targets --all-features -- -D warnings \
+                  -A clippy::pedantic > /tmp/clippy.$tc.raw 2>&1
+                clippy=$?
+                # Keep every error/warning *and* the `-->` location line that
+                # follows it: the location is what makes a report actionable.
+                sed -e 's/\x1b\[[0-9;]*m//g' /tmp/clippy.$tc.raw \
+                  | grep -E '^(error|warning)|^\s+--> ' > /tmp/clippy.$tc.txt
+                echo "clippy exit: $clippy" >> /tmp/report.md
+                echo "findings: $(grep -cE '^(error|warning)' /tmp/clippy.$tc.txt)" >> /tmp/report.md
+                if [ "$clippy" -ne 0 ] && [ "$(wc -l < /tmp/clippy.$tc.txt)" -eq 0 ]; then
+                  tail -6 /tmp/clippy.$tc.raw | sed -e 's/\x1b\[[0-9;]*m//g' >> /tmp/report.md
+                fi
+              fi
+              cd ..
+            else
+              echo "toolchain not installed by the action" >> /tmp/report.md
+            fi
+            echo '```' >> /tmp/report.md
+            echo >> /tmp/report.md
+          done
+
+          # Every finding, one line each: the file to edit, the lint and the text.
+          for tc in 1.89.0; do
+            if [ -s "/tmp/clippy.$tc.txt" ]; then
+              echo "### Findings under $tc" >> /tmp/report.md
+              echo '```' >> /tmp/report.md
+              sed -E 's|/home/runner/work/VukkoLLM/VukkoLLM/||' "/tmp/clippy.$tc.txt" >> /tmp/report.md
+              echo '```' >> /tmp/report.md
+            fi
+          done
+
+          # The fmt diff, verbatim, so it can be applied rather than retyped.
+          echo '### Diff `cargo fmt` wants' >> /tmp/report.md
+          echo '```diff' >> /tmp/report.md
+          cd /home/user 2>/dev/null || cd ..
+          cd "$GITHUB_WORKSPACE/rust" 2>/dev/null || true
+          cargo fmt --all
+          git -c core.pager=cat diff --no-color -- rust >> /tmp/report.md
+          echo '```' >> /tmp/report.md
+          exit 0
+
+      - name: Collect test results
+        working-directory: rust
+        run: |
+          set +e
+          cargo test --all-features --no-fail-fast > /tmp/tests.raw 2>&1
+          status=$?
+          sed -e 's/\x1b\[[0-9;]*m//g' /tmp/tests.raw > /tmp/tests.txt
+          {
+            echo "cargo test exit: $status"
+            echo '```'
+            grep -E '^(test |failures:|error|---- )' /tmp/tests.txt | head -120
+            echo '```'
+          } > /tmp/tests.md
+          # A failing assertion's message lives after its `---- name stdout ----`
+          echo 'First failure detail:' >> /tmp/tests.md
+          echo '```' >> /tmp/tests.md
+          awk '/^---- .* stdout ----/{flag=1} flag{print} /^$/{if(flag) count++} count>6{exit}' /tmp/tests.txt \
+            | head -60 >> /tmp/tests.md
+          echo '```' >> /tmp/tests.md
+          exit 0
+
+      - name: Post test results
+        if: always()
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          PR: ${{ github.event.pull_request.number }}
+        run: gh pr comment "$PR" --body-file /tmp/tests.md --repo "$GITHUB_REPOSITORY"
+
+      - name: Capture the fmt diff
+        working-directory: rust
+        run: |
+          set +e
+          cargo fmt --all --check > /tmp/fmt.check 2>&1
+          echo "check exit: $?" > /tmp/fmt.md
+          cargo fmt --all
+          echo '```diff' >> /tmp/fmt.md
+          git -c core.pager=cat diff --no-color -- . >> /tmp/fmt.md
+          echo '```' >> /tmp/fmt.md
+          wc -l /tmp/fmt.md
+
+      - name: Post the fmt diff alone
+        if: always()
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          PR: ${{ github.event.pull_request.number }}
+        run: gh pr comment "$PR" --body-file /tmp/fmt.md --repo "$GITHUB_REPOSITORY"
+
+      - name: Post the report on the pull request
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          PR: ${{ github.event.pull_request.number }}
+        run: gh pr comment "$PR" --body-file /tmp/report.md --repo "$GITHUB_REPOSITORY"

@@ -1,0 +1,33 @@
+name: typecheck
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+concurrency:
+  group: typecheck-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  typecheck:
+    name: TypeScript and unit tests
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version-file: .nvmrc
+          cache: 'npm'
+
+      # Frozen install: the lockfile is the input, not a suggestion.
+      - run: npm ci
+
+      - name: Type-check the app and the tests
+        run: npm run typecheck
+
+      - name: Jest (contracts, providers, repositories, UI, migration twins)
+        run: npm test -- --ci --runInBand

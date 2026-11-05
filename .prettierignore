@@ -1,0 +1,12 @@
+node_modules/
+android/
+ios/
+rust/
+legacy-reference/
+tests/migration/fixtures/out/
+package-lock.json
+*.md
+.aistudio/
+.projectId.json
+signatures/
+.vscode/
