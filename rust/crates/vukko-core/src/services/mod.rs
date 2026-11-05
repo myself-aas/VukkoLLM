@@ -7,6 +7,7 @@
 
 pub mod backup;
 pub mod bootstrap;
+pub mod chat;
 pub mod export;
 pub mod github;
 pub mod storage;

@@ -9,12 +9,12 @@ that violates it is merged.
 | 1 | Existing users retain local data | `tests/migration/fixtures/baseline.test.js` (legacy contents), `tests/baseline/invariants.test.js` → database filename; `tests/migration/adoption.test.js` and `tests/e2e/lifecycle.test.js` → every legacy row survives and stays readable |
 | 2 | Application ID remains `com.aistudio.vukko.kzmp` | `tests/baseline/invariants.test.js` → *applicationId stays com.aistudio.vukko.kzmp* |
 | 3 | Signing key remains unchanged | `tests/baseline/invariants.test.js` → debug signing config is preserved; release keystore is not in the repository, so this is a release-process check (see note) |
-| 4 | Database filename remains `vukko_sovereign.db`, or an explicit migration path exists | `tests/baseline/invariants.test.js` → *database filename stays vukko_sovereign.db*; `tests/migration` (Phase 3 tests) |
+| 4 | Database filename remains `vukko_sovereign.db`, or an explicit migration path exists | `tests/baseline/invariants.test.js` → *database filename stays vukko_sovereign.db*; `tests/migration/adoption.test.js`, `tests/repository/repositories.test.js` |
 | 5 | API keys and OAuth tokens are never logged | `tests/baseline/invariants.test.js` → *no Kotlin source logs credentials*; Rust side: `rust/crates/vukko-bridge` redaction tests |
 | 6 | Secrets are not stored in plaintext | `tests/baseline/invariants.test.js` → *API keys and OAuth tokens are not stored in SharedPreferences*; `SecurePreferencesManager` (Keystore AES-GCM) |
 | 7 | Local-first behaviour remains available offline | `tests/baseline/invariants.test.js` → *local search … stays local*; Rust repository tests run without network |
-| 8 | Streaming chat cancellation remains supported | `tests/baseline/invariants.test.js` → *the chat executor keeps a cancellable streaming path*; bridge event tests (Phase 4) |
-| 9 | Markdown, JSON and plain-text exports remain compatible | `tests/baseline/invariants.test.js` → *markdown, json and plain-text exports keep their documented headers*; Rust export tests (Phase 3) |
+| 8 | Streaming chat cancellation remains supported | `tests/baseline/invariants.test.js` → *the chat executor keeps a cancellable streaming path*; `tests/providers/chatService.test.ts` → *cancelling stops deltas*; `rust/crates/vukko-core/src/services/chat.rs` tests |
+| 9 | Markdown, JSON and plain-text exports remain compatible | `tests/baseline/invariants.test.js` → *markdown, json and plain-text exports keep their documented headers*; `rust/crates/vukko-core/src/services/export.rs` tests; `tests/repository/repositories.test.js` → export format assertions |
 | 10 | Provider/model identifiers remain stable | `tests/baseline/invariants.test.js` → *provider identifiers are unchanged*, *model identifiers are unchanged* |
 | 11 | Workspace/thread/message/document/citation/agent-step IDs remain stable | `tests/baseline/invariants.test.js` → *bootstrap seed identifiers stay stable*; `tests/migration` round-trip assertions |
 | 12 | No destructive schema migration | `tests/baseline/invariants.test.js` → *the Room database no longer falls back to destroying user data* |

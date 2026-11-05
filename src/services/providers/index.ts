@@ -3,7 +3,7 @@
  *
  * Rust equivalent: `rust/crates/vukko-core/src/providers/`. The parsing rules
  * are identical and are tested against the same recorded payloads
- * (`tests/providers/fixtures.mjs`).
+ * (`tests/providers/fixtures.js`).
  */
 
 import type { ProviderType } from '../../types/provider';
