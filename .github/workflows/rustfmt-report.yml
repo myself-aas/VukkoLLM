@@ -4,10 +4,8 @@ name: rust diagnostics
 #
 # This repository is maintained from an environment without a Rust toolchain and
 # static.rust-lang.org is unreachable there, so `cargo fmt` and `cargo clippy`
-# cannot be run before a push. This workflow runs both with the pinned toolchain
-# and posts a compact report as a pull-request comment: clippy findings collapsed
-# to one line per lint (a count and the first location), because the raw output
-# is far too long for a comment. The real gates stay in rust.yml; this file
+# cannot be run before a push. This workflow runs both and posts a compact
+# report as a pull-request comment. The real gates stay in rust.yml; this file
 # cannot make anything pass.
 
 on:
@@ -19,9 +17,9 @@ permissions:
 
 jobs:
   report:
-    name: Report formatting and clippy findings
+    name: Formatting and lints across toolchains
     runs-on: ubuntu-latest
-    timeout-minutes: 30
+    timeout-minutes: 45
     steps:
       - uses: actions/checkout@v4
 
@@ -30,46 +28,62 @@ jobs:
           components: rustfmt, clippy
 
       - name: Collect the report
-        working-directory: rust
         run: |
           set +e
-          {
-            rustc --version
-            echo
-            echo '=== cargo fmt --all --check ==='
-            cargo fmt --all --check 2>&1 | head -40
-            echo "fmt exit: ${PIPESTATUS[0]}"
-            echo
-            echo '=== cargo clippy -- -D warnings (grouped) ==='
-          } > /tmp/report.md
+          : > /tmp/report.md
+          echo 'Which toolchain can resolve the dependency graph at all?' >> /tmp/report.md
+          echo >> /tmp/report.md
 
-          # `--message-format=short` prints one line per finding, with an
-          # absolute path: match the ": warning:" / ": error:" marker, not a
-          # leading directory name.
-          cargo clippy --all-targets --all-features --message-format=short > /tmp/clippy.raw 2>&1
-          clippy_status=$?
-          grep -E ': (warning|error):' /tmp/clippy.raw > /tmp/clippy.txt
-          echo "clippy exit: $clippy_status" >> /tmp/report.md
-          echo '```' >> /tmp/report.md
-          echo "total findings: $(wc -l < /tmp/clippy.txt)" >> /tmp/report.md
-          # One line per distinct lint, with its count and first location.
-          sed -E 's/^[^ ]+ //' /tmp/clippy.txt | sed -E 's/^warning: //;s/^error: //' \
-            | sed -E "s/.*\[([a-z_:]+)\]$/\1/" | sort | uniq -c | sort -rn >> /tmp/report.md
-          echo '```' >> /tmp/report.md
-          echo 'First occurrence of each lint:' >> /tmp/report.md
-          echo '```' >> /tmp/report.md
-          grep -oE '\[[a-z_:]+\]$' /tmp/clippy.txt | sort -u > /tmp/lints.txt
-          while read -r lint; do
-            name=$(echo "$lint" | tr -d '[]')
-            grep -m1 -F "$lint" /tmp/clippy.txt >> /tmp/report.md
-          done < /tmp/lints.txt
-          echo '```' >> /tmp/report.md
-          # Anything clippy printed that is not a finding (a build failure, a
-          # missing dependency) is the reason the gate would fail, so keep it.
-          echo 'Last lines of raw output:' >> /tmp/report.md
-          echo '```' >> /tmp/report.md
-          tail -15 /tmp/clippy.raw >> /tmp/report.md
-          echo '```' >> /tmp/report.md
+          for tc in 1.79.0 1.85.0 stable; do
+            {
+              echo "=== $tc ==="
+              echo '```'
+            } >> /tmp/report.md
+
+            if cargo "+$tc" --version >/dev/null 2>&1; then
+              cd rust
+              cargo "+$tc" generate-lockfile >/tmp/lock.$tc.txt 2>&1
+              lock=$?
+              echo "generate-lockfile exit: $lock" >> /tmp/report.md
+              if [ $lock -ne 0 ]; then
+                grep -E 'error|Caused by|requires' /tmp/lock.$tc.txt | head -6 >> /tmp/report.md
+              else
+                fmt=$(cargo "+$tc" fmt --all --check >/dev/null 2>&1; echo $?)
+                echo "fmt exit: $fmt" >> /tmp/report.md
+                cargo "+$tc" clippy --all-targets --all-features --message-format=short \
+                  > /tmp/clippy.$tc.raw 2>&1
+                clippy=$?
+                sed -e 's/\x1b\[[0-9;]*m//g' /tmp/clippy.$tc.raw \
+                  | grep -E ': (warning|error):' > /tmp/clippy.$tc.txt
+                echo "clippy exit: $clippy" >> /tmp/report.md
+                echo "findings: $(wc -l < /tmp/clippy.$tc.txt)" >> /tmp/report.md
+                if [ "$clippy" -ne 0 ] && [ "$(wc -l < /tmp/clippy.$tc.txt)" -eq 0 ]; then
+                  tail -6 /tmp/clippy.$tc.raw | sed -e 's/\x1b\[[0-9;]*m//g' >> /tmp/report.md
+                fi
+              fi
+              cd ..
+            else
+              echo "toolchain not installed by the action" >> /tmp/report.md
+            fi
+            echo '```' >> /tmp/report.md
+            echo >> /tmp/report.md
+          done
+
+          # The 1.85 findings, grouped, with the first occurrence of each lint.
+          if [ -s /tmp/clippy.1.85.0.txt ]; then
+            echo '### Lints under 1.85.0' >> /tmp/report.md
+            echo '```' >> /tmp/report.md
+            sed -E 's/^.*: (warning|error): //' /tmp/clippy.1.85.0.txt \
+              | sed -E 's/.*\[([a-z_:]+)\]$/\1/' | sort | uniq -c | sort -rn >> /tmp/report.md
+            echo '```' >> /tmp/report.md
+            echo '### First occurrence of each lint (1.85.0)' >> /tmp/report.md
+            echo '```' >> /tmp/report.md
+            grep -oE '\[[a-z_:]+\]$' /tmp/clippy.1.85.0.txt | sort -u > /tmp/lints.txt
+            while read -r lint; do
+              grep -m1 -F "$lint" /tmp/clippy.1.85.0.txt >> /tmp/report.md
+            done < /tmp/lints.txt
+            echo '```' >> /tmp/report.md
+          fi
           exit 0
 
       - name: Post the report on the pull request
