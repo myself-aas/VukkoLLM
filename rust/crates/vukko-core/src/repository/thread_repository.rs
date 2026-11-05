@@ -139,7 +139,7 @@ pub fn refresh_stats(
 mod tests {
     use super::*;
     use crate::repository::test_support::fresh_db;
-    use crate::repository::{document_repository, message_repository, workspace_repository};
+    use crate::repository::{message_repository, workspace_repository};
 
     fn workspace(conn: &Connection, name: &str) -> crate::domain::Workspace {
         workspace_repository::create(
@@ -229,7 +229,6 @@ mod tests {
         let listed = list(&conn, &mine.id).unwrap();
         assert_eq!(listed.len(), 1);
         assert_eq!(listed[0].name, "Mine");
-        let _ = document_repository::list(&conn, &mine.id);
     }
 
     #[test]
