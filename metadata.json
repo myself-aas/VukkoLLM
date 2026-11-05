@@ -1,0 +1,6 @@
+{
+  "name": "Vukko",
+  "description": "Premium AI workspace powered by SpaceX sovereign standards. Secure, fast, and local knowledge management.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
