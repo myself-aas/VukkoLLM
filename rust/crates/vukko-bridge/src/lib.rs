@@ -118,9 +118,7 @@ impl Engine {
     }
 
     pub fn initialize(&self) -> Result<InitializationState, BridgeError> {
-        let workspace_count = self
-            .with_conn(workspace_repository::list)?
-            .len() as u32;
+        let workspace_count = self.with_conn(workspace_repository::list)?.len() as u32;
         Ok(InitializationState {
             schema_ownership: if self.adoption.to_version > 0 {
                 "RUST".to_string()
