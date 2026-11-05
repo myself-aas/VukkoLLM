@@ -12,12 +12,23 @@ use serde::{Deserialize, Serialize};
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "SCREAMING_SNAKE_CASE")]
 pub enum ProviderType {
+// The variants are already upper case, and `rename_all` would re-case the
+// *identifier* — NOT_FOUND serialises as N_O_T__F_O_U_N_D — which would break
+// every persisted value. An explicit rename is a no-op for Rust and a contract
+// for the wire, so the shape cannot drift with a serde default.
+    #[serde(rename = "GEMINI")]
     GEMINI,
+    #[serde(rename = "OPENAI")]
     OPENAI,
+    #[serde(rename = "ANTHROPIC")]
     ANTHROPIC,
+    #[serde(rename = "DEEPSEEK")]
     DEEPSEEK,
+    #[serde(rename = "GROQ")]
     GROQ,
+    #[serde(rename = "OLLAMA")]
     OLLAMA,
+    #[serde(rename = "INSTANCE")]
     INSTANCE,
 }
 

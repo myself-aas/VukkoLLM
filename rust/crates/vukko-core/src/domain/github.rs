@@ -13,8 +13,15 @@ use super::chat::Timestamp;
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "SCREAMING_SNAKE_CASE")]
 pub enum PRState {
+// The variants are already upper case, and `rename_all` would re-case the
+// *identifier* — NOT_FOUND serialises as N_O_T__F_O_U_N_D — which would break
+// every persisted value. An explicit rename is a no-op for Rust and a contract
+// for the wire, so the shape cannot drift with a serde default.
+    #[serde(rename = "OPEN")]
     OPEN,
+    #[serde(rename = "CLOSED")]
     CLOSED,
+    #[serde(rename = "MERGED")]
     MERGED,
 }
 
@@ -93,11 +100,21 @@ pub struct GitHubUserProfile {
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "SCREAMING_SNAKE_CASE")]
 pub enum GitHubAuthStatus {
+// The variants are already upper case, and `rename_all` would re-case the
+// *identifier* — NOT_FOUND serialises as N_O_T__F_O_U_N_D — which would break
+// every persisted value. An explicit rename is a no-op for Rust and a contract
+// for the wire, so the shape cannot drift with a serde default.
+    #[serde(rename = "UNLINKED")]
     UNLINKED,
+    #[serde(rename = "REQUESTING_CODE")]
     REQUESTING_CODE,
+    #[serde(rename = "CODE_RECEIVED")]
     CODE_RECEIVED,
+    #[serde(rename = "POLLING_TOKEN")]
     POLLING_TOKEN,
+    #[serde(rename = "CONNECTED")]
     CONNECTED,
+    #[serde(rename = "ERROR")]
     ERROR,
 }
 

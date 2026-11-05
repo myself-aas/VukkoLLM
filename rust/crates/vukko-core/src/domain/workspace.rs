@@ -13,11 +13,18 @@ use super::chat::Timestamp;
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "SCREAMING_SNAKE_CASE")]
 pub enum QueryMode {
+// The variants are already upper case, and `rename_all` would re-case the
+// *identifier* — NOT_FOUND serialises as N_O_T__F_O_U_N_D — which would break
+// every persisted value. An explicit rename is a no-op for Rust and a contract
+// for the wire, so the shape cannot drift with a serde default.
     /// Standard conversation with the workspace prompt as context.
+    #[serde(rename = "CHAT")]
     CHAT,
     /// Strict RAG: answer only from embedded documents.
+    #[serde(rename = "QUERY")]
     QUERY,
     /// Autonomous multi-step planning and tool execution.
+    #[serde(rename = "AGENT")]
     AGENT,
 }
 

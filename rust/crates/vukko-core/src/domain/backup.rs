@@ -15,7 +15,13 @@ use super::chat::Timestamp;
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "SCREAMING_SNAKE_CASE")]
 pub enum BackupTarget {
+// The variants are already upper case, and `rename_all` would re-case the
+// *identifier* — NOT_FOUND serialises as N_O_T__F_O_U_N_D — which would break
+// every persisted value. An explicit rename is a no-op for Rust and a contract
+// for the wire, so the shape cannot drift with a serde default.
+    #[serde(rename = "GITHUB")]
     GITHUB,
+    #[serde(rename = "CLOUD_BUCKET")]
     CLOUD_BUCKET,
 }
 
@@ -25,7 +31,13 @@ pub enum BackupTarget {
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "SCREAMING_SNAKE_CASE")]
 pub enum BackupTrigger {
+// The variants are already upper case, and `rename_all` would re-case the
+// *identifier* — NOT_FOUND serialises as N_O_T__F_O_U_N_D — which would break
+// every persisted value. An explicit rename is a no-op for Rust and a contract
+// for the wire, so the shape cannot drift with a serde default.
+    #[serde(rename = "SCHEDULED")]
     SCHEDULED,
+    #[serde(rename = "MANUAL")]
     MANUAL,
 }
 
@@ -35,8 +47,15 @@ pub enum BackupTrigger {
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "SCREAMING_SNAKE_CASE")]
 pub enum BackupStatus {
+// The variants are already upper case, and `rename_all` would re-case the
+// *identifier* — NOT_FOUND serialises as N_O_T__F_O_U_N_D — which would break
+// every persisted value. An explicit rename is a no-op for Rust and a contract
+// for the wire, so the shape cannot drift with a serde default.
+    #[serde(rename = "COMPLETED")]
     COMPLETED,
+    #[serde(rename = "FAILED")]
     FAILED,
+    #[serde(rename = "UNSUPPORTED")]
     UNSUPPORTED,
 }
 

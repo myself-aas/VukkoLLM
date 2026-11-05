@@ -17,8 +17,15 @@ pub type Timestamp = i64;
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "SCREAMING_SNAKE_CASE")]
 pub enum MessageSender {
+// The variants are already upper case, and `rename_all` would re-case the
+// *identifier* — NOT_FOUND serialises as N_O_T__F_O_U_N_D — which would break
+// every persisted value. An explicit rename is a no-op for Rust and a contract
+// for the wire, so the shape cannot drift with a serde default.
+    #[serde(rename = "USER")]
     USER,
+    #[serde(rename = "ASSISTANT")]
     ASSISTANT,
+    #[serde(rename = "SYSTEM")]
     SYSTEM,
 }
 
@@ -48,9 +55,17 @@ impl MessageSender {
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "SCREAMING_SNAKE_CASE")]
 pub enum AgentStepStatus {
+// The variants are already upper case, and `rename_all` would re-case the
+// *identifier* — NOT_FOUND serialises as N_O_T__F_O_U_N_D — which would break
+// every persisted value. An explicit rename is a no-op for Rust and a contract
+// for the wire, so the shape cannot drift with a serde default.
+    #[serde(rename = "PENDING")]
     PENDING,
+    #[serde(rename = "RUNNING")]
     RUNNING,
+    #[serde(rename = "COMPLETED")]
     COMPLETED,
+    #[serde(rename = "FAILED")]
     FAILED,
 }
 
