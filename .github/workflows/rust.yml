@@ -11,7 +11,7 @@ on:
   workflow_dispatch:
 
 env:
-  RUST_VERSION: 1.79.0
+  RUST_VERSION: 1.89.0
   CARGO_TERM_COLOR: always
 
 concurrency:
@@ -83,6 +83,13 @@ jobs:
           fi
 
       # Warnings are errors: a warning that survives a PR becomes permanent.
+      #
+      # `-D warnings` covers the default lint groups, which is what this gate
+      # means. It does not promote `clippy::pedantic`, and it must not: pedantic
+      # is optional advice (doc backticks, `# Errors` sections, function length)
+      # that the crates opt into with `#![warn(clippy::pedantic)]` so it shows up
+      # without failing the build. Denying it as well made every one of those
+      # suggestions a compile error and the gate unusable.
       - name: Clippy
         working-directory: rust
         run: cargo clippy --all-targets --all-features -- -D warnings

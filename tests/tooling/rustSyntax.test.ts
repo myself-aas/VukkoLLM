@@ -34,11 +34,21 @@ function rustFiles(directory: string): string[] {
   return found.sort();
 }
 
+/**
+ * The buffer the parser is given.
+ *
+ * The JS binding's default is 32 KiB and it throws a bare `Invalid argument`
+ * when the source exceeds it — which is what happened to github.rs the moment
+ * rustfmt reformatted it. A syntax gate that fails on file *size* is reporting
+ * on the tool, not on the code.
+ */
+const PARSER_BUFFER_BYTES = 1024 * 1024;
+
 /** Every offending node, with the line it starts on. */
 function problems(source: string): string[] {
   const parser = new Parser();
   parser.setLanguage(Rust);
-  const tree = parser.parse(source);
+  const tree = parser.parse(source, null, { bufferSize: PARSER_BUFFER_BYTES });
   const found: string[] = [];
 
   const visit = (node: any) => {
@@ -56,6 +66,15 @@ function problems(source: string): string[] {
   visit(tree.rootNode);
   return found;
 }
+
+describe('the syntax gate itself', () => {
+  test('a file larger than the default parser buffer is still parsed', () => {
+    // The regression this guards: a 32 KiB file parsed and a 33 KiB file threw,
+    // so a formatting commit could take the gate down while the code was fine.
+    const source = `fn main() {}\n${'\n'.repeat(40 * 1024)}`;
+    expect(problems(source)).toEqual([]);
+  });
+});
 
 describe('the Rust tree parses cleanly', () => {
   const files = rustFiles(RUST_ROOT);

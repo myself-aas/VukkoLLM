@@ -1,7 +1,12 @@
 # Pinned so every machine and CI build produce the same shipped library.
 # Bump deliberately, together with RUST_VERSION in .github/workflows/rust.yml.
+#
+# 1.89.0 is not a preference, it is the floor of this dependency graph:
+# `getrandom 0.4` needs Cargo's `edition2024` support (1.85+) and `uuid 1.29`
+# declares `rust-version = 1.89`. Pinning lower does not build slower, it does
+# not build at all.
 [toolchain]
-channel = "1.79.0"
+channel = "1.89.0"
 components = ["rustfmt", "clippy"]
 targets = [
   "aarch64-linux-android",

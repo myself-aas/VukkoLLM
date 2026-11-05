@@ -38,7 +38,7 @@ jobs:
           restore-keys: gradle-${{ runner.os }}-
 
       # The Rust libraries the app links are built before Gradle packages them.
-      # No `toolchain:`: rust/rust-toolchain.toml names 1.79.0 and already
+      # No `toolchain:`: rust/rust-toolchain.toml names the version and already
       # lists these three targets. Passing a toolchain here would install and
       # prefer `stable` instead.
       - uses: actions-rust-lang/setup-rust-toolchain@v1

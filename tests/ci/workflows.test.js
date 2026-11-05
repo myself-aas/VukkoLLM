@@ -98,7 +98,9 @@ describe('workflows only run what this repository has', () => {
     const offenders = [];
     for (const name of readdirSync(WORKFLOWS)) {
       const yaml = read(name);
-      for (const match of yaml.matchAll(/run:\s+(?:node|npx tsx|ts-node)\s+([\w./-]+\.(?:mjs|cjs|js|ts))/g)) {
+      for (const match of yaml.matchAll(
+        /run:\s+(?:node|npx tsx|ts-node)\s+([\w./-]+\.(?:mjs|cjs|js|ts))/g,
+      )) {
         const script = match[1];
         if (!existsSync(join(ROOT, script))) offenders.push(`${name}: ${script}`);
       }
@@ -125,7 +127,8 @@ describe('failure diagnostics', () => {
     const build = readFileSync(join(ROOT, 'scripts', 'build-fixtures.cjs'), 'utf8');
     const written = /['"]([\w./]*fixtures[\w./]*)['"]/.exec(build);
     const workflow = read('migration-tests.yml');
-    const upload = /Upload the fixture database on failure[\s\S]*?path:\s*([\s\S]*?)if-no-files-found/;
+    const upload =
+      /Upload the fixture database on failure[\s\S]*?path:\s*([\s\S]*?)if-no-files-found/;
     const block = upload.exec(workflow);
     expect(block).not.toBeNull();
     expect(block[1]).toMatch(/fixtures\/out\/\*\.db/);
@@ -223,6 +226,38 @@ describe('the packaging contract', () => {
     const pinned = /channel = "(\d+\.\d+\.\d+)"/.exec(toolchain)?.[1];
     expect(pinned).toBeTruthy();
     expect(workflow).toContain(`RUST_VERSION: ${pinned}`);
+  });
+
+  test('the pinned Rust version is the floor the graph actually needs', () => {
+    // The pin is not a preference. A lower number does not build slower, it does
+    // not build: `getrandom 0.4` needs Cargo's edition2024 support (1.85+) and
+    // `uuid 1.29` declares `rust-version = 1.89`, which is how 1.79 was found to
+    // be unable to parse a transitive dependency's manifest at all.
+    const pinned = /channel = "(\d+)\.(\d+)\.(\d+)"/.exec(read('rust/rust-toolchain.toml'));
+    const major = Number(pinned[1]);
+    const minor = Number(pinned[2]);
+    expect(major).toBe(1);
+    expect(minor).toBeGreaterThanOrEqual(89);
+
+    // The workspace floor and the pin are the same statement, said twice; a
+    // divergence means one of them is stale and only CI would notice.
+    expect(read('rust/Cargo.toml')).toContain(`rust-version = "${major}.${minor}"`);
+
+    // Crates inherit the workspace floor rather than repeating it: a crate that
+    // hard-codes its own version is exactly how the two drift apart.
+    for (const crate of ['vukko-core', 'vukko-db', 'vukko-bridge']) {
+      expect(read(`rust/crates/${crate}/Cargo.toml`)).toContain('rust-version.workspace = true');
+    }
+  });
+
+  test('clippy denies warnings without denying its optional advice', () => {
+    // `-D warnings` covers the default groups, which is the gate. It must not
+    // start denying `clippy::pedantic`: the crates opt into pedantic as a warn
+    // so the suggestions are visible, and denying them turns doc-backtick and
+    // "# Errors section" advice into build failures.
+    const clippy = /cargo clippy[^\n]*/.exec(read('.github/workflows/rust.yml'))?.[0] ?? '';
+    expect(clippy).toContain('-D warnings');
+    expect(clippy).not.toMatch(/pedantic/);
   });
 
   test('the packaging guide names every target the plan requires', () => {

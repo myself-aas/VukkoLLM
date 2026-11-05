@@ -18,7 +18,7 @@ rust/
 
 | Tool | Version | Where |
 |---|---|---|
-| Rust | 1.79.0 | `rust/rust-toolchain.toml`, `RUST_VERSION` in `.github/workflows/rust.yml` |
+| Rust | 1.89.0 | `rust/rust-toolchain.toml`, `RUST_VERSION` in `.github/workflows/rust.yml` |
 | Node | see `.nvmrc` | CI reads it with `setup-node` |
 | React Native | 0.81.4 | `package.json` (exact, no caret) |
 | cargo-ndk | 3.x | installed by the Android build step below |
