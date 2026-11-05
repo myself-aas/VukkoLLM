@@ -119,7 +119,7 @@ impl Engine {
 
     pub fn initialize(&self) -> Result<InitializationState, BridgeError> {
         let workspace_count = self
-            .with_conn(|conn| workspace_repository::list(conn))?
+            .with_conn(workspace_repository::list)?
             .len() as u32;
         Ok(InitializationState {
             schema_ownership: if self.adoption.to_version > 0 {
@@ -137,7 +137,7 @@ impl Engine {
     }
 
     pub fn list_workspaces(&self) -> Result<Vec<Workspace>, BridgeError> {
-        self.with_conn(|conn| workspace_repository::list(conn))
+        self.with_conn(workspace_repository::list)
     }
 
     pub fn create_workspace(&self, name: &str) -> Result<Workspace, BridgeError> {
@@ -264,7 +264,7 @@ impl Engine {
     }
 
     pub fn storage_stats(&self) -> Result<SovereignStorageStats, BridgeError> {
-        self.with_conn(|conn| storage_repository::stats(conn))
+        self.with_conn(storage_repository::stats)
     }
 
     pub fn run_integrity_check(&self) -> Result<IntegrityCheckResult, BridgeError> {
@@ -273,7 +273,7 @@ impl Engine {
     }
 
     pub fn settings(&self) -> Result<settings_repository::AppSettings, BridgeError> {
-        self.with_conn(|conn| settings_repository::get_all(conn))
+        self.with_conn(settings_repository::get_all)
     }
 
     pub fn set_setting(&self, key: &str, value: &str) -> Result<(), BridgeError> {
