@@ -79,6 +79,40 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     private val _pinnedMessages = MutableStateFlow<List<ChatMessage>>(emptyList())
     val pinnedMessages: StateFlow<List<ChatMessage>> = _pinnedMessages.asStateFlow()
 
+    // The GitHub surface is declared before `init` on purpose: Kotlin runs
+    // property initialisers and `init` blocks in declaration order, and the init
+    // block below launches `refreshGitHubData()`. Declared after it, `gitHubService`
+    // is still null when that coroutine starts, and the app dies on launch with a
+    // NullPointerException inside the ViewModel constructor.
+    // GitHub Operations Suite
+    val gitHubService = com.vukko.data.github.GitHubService()
+    val gitHubOAuthManager = com.vukko.data.github.GitHubOAuthManager()
+    val showGitHubManager = MutableStateFlow(false)
+
+    private val _gitHubRepositories = MutableStateFlow<List<GitHubRepository>>(emptyList())
+    val gitHubRepositories: StateFlow<List<GitHubRepository>> = _gitHubRepositories.asStateFlow()
+
+    private val _gitHubPullRequests = MutableStateFlow<List<GitHubPullRequest>>(emptyList())
+    val gitHubPullRequests: StateFlow<List<GitHubPullRequest>> = _gitHubPullRequests.asStateFlow()
+
+    private val _gitHubCommits = MutableStateFlow<List<GitHubCommit>>(emptyList())
+    val gitHubCommits: StateFlow<List<GitHubCommit>> = _gitHubCommits.asStateFlow()
+
+    private val _gitHubOAuthState = MutableStateFlow<GitHubOAuthState>(
+        if (preferencesManager.githubOAuthConnected && preferencesManager.githubUsername.isNotBlank()) {
+            GitHubOAuthState.Connected(
+                GitHubUserProfile(
+                    login = preferencesManager.githubUsername,
+                    avatarUrl = preferencesManager.githubAvatarUrl,
+                    htmlUrl = "https://github.com/${preferencesManager.githubUsername}"
+                )
+            )
+        } else {
+            GitHubOAuthState.Unlinked
+        }
+    )
+    val gitHubOAuthState: StateFlow<GitHubOAuthState> = _gitHubOAuthState.asStateFlow()
+
     init {
         viewModelScope.launch {
             workspaces.collect { wsList ->
@@ -332,35 +366,6 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         preferencesManager.instanceApiKey = key
         showInstanceConnect.value = false
     }
-
-    // GitHub Operations Suite
-    val gitHubService = com.vukko.data.github.GitHubService()
-    val gitHubOAuthManager = com.vukko.data.github.GitHubOAuthManager()
-    val showGitHubManager = MutableStateFlow(false)
-
-    private val _gitHubRepositories = MutableStateFlow<List<GitHubRepository>>(emptyList())
-    val gitHubRepositories: StateFlow<List<GitHubRepository>> = _gitHubRepositories.asStateFlow()
-
-    private val _gitHubPullRequests = MutableStateFlow<List<GitHubPullRequest>>(emptyList())
-    val gitHubPullRequests: StateFlow<List<GitHubPullRequest>> = _gitHubPullRequests.asStateFlow()
-
-    private val _gitHubCommits = MutableStateFlow<List<GitHubCommit>>(emptyList())
-    val gitHubCommits: StateFlow<List<GitHubCommit>> = _gitHubCommits.asStateFlow()
-
-    private val _gitHubOAuthState = MutableStateFlow<GitHubOAuthState>(
-        if (preferencesManager.githubOAuthConnected && preferencesManager.githubUsername.isNotBlank()) {
-            GitHubOAuthState.Connected(
-                GitHubUserProfile(
-                    login = preferencesManager.githubUsername,
-                    avatarUrl = preferencesManager.githubAvatarUrl,
-                    htmlUrl = "https://github.com/${preferencesManager.githubUsername}"
-                )
-            )
-        } else {
-            GitHubOAuthState.Unlinked
-        }
-    )
-    val gitHubOAuthState: StateFlow<GitHubOAuthState> = _gitHubOAuthState.asStateFlow()
 
     fun refreshGitHubData() {
         viewModelScope.launch {
