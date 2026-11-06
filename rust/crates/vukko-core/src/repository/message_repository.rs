@@ -130,7 +130,14 @@ pub fn append(
     // Fails with NOT_FOUND when the thread is gone, before anything is written.
     let thread = thread_repository::get(conn, thread_id)?;
     let sender = input.sender.unwrap_or(MessageSender::USER);
-    let content = require_text(&input.content, "content", 200_000)?;
+    // A streaming assistant row is inserted empty on purpose: the provider fills
+    // it through `append_delta`. Every other message must carry text, so a
+    // blank row is still an error rather than an invisible message in a thread.
+    let content = if input.is_streaming && input.content.trim().is_empty() {
+        String::new()
+    } else {
+        require_text(&input.content, "content", 200_000)?
+    };
     let timestamp = input.timestamp.unwrap_or_else(now_millis);
     if timestamp <= 0 {
         return Err(VukkoError::validation(

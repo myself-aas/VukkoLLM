@@ -103,13 +103,25 @@ pub(crate) mod test_support {
 
     /// Migrated database with no rows. The caller is expected to keep the path
     /// unique per test (`name`) and let the OS clean up its temp directory.
+    ///
+    /// The counter is not decoration: whole suites call this with the same one or
+    /// two names, the tests run in parallel, and a millisecond-resolution name
+    /// gives two of them one file. The second `adopt` truncates the file the
+    /// first test is still using, which surfaces as a random
+    /// "database disk image is malformed" failure in an unrelated test.
     pub fn fresh_db(name: &str) -> Connection {
+        use std::sync::atomic::{AtomicU64, Ordering};
+
+        static SEQUENCE: AtomicU64 = AtomicU64::new(0);
+        let sequence = SEQUENCE.fetch_add(1, Ordering::Relaxed);
+
         let mut path: PathBuf = std::env::temp_dir();
         path.push(format!(
-            "vukko-repo-{}-{}-{}.db",
+            "vukko-repo-{}-{}-{}-{}.db",
             name,
             std::process::id(),
-            super::now_millis()
+            super::now_millis(),
+            sequence
         ));
         let _ = std::fs::remove_file(&path);
         let (conn, _) = vukko_db::adopt(&path).expect("adopt test database");

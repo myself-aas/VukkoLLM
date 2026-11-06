@@ -37,9 +37,15 @@ fn from_row(row: &Row<'_>) -> rusqlite::Result<Workspace> {
     })
 }
 
+/// Lists workspaces oldest first.
+///
+/// `rowid` breaks the tie, not `id`: the Kotlin app ordered by `createdAt` alone,
+/// and the seeded and adopted workspaces all share one timestamp, so insertion
+/// order is what its drawer showed. Sorting by `id` there reordered the user's
+/// workspaces into an arbitrary alphabetical one.
 pub fn list(conn: &Connection) -> Result<Vec<Workspace>, VukkoError> {
     let sql = format!(
-        "SELECT {} FROM workspaces ORDER BY createdAt ASC, id ASC",
+        "SELECT {} FROM workspaces ORDER BY createdAt ASC, rowid ASC",
         COLUMNS
     );
     let mut statement = conn.prepare(&sql)?;

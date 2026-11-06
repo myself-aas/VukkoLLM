@@ -17,7 +17,7 @@ use rusqlite::Connection;
 use serde::{Deserialize, Serialize};
 
 use crate::domain::{ChatMessage, VukkoError, DATABASE_NAME};
-use crate::repository::message_repository;
+use crate::repository::{message_repository, thread_repository};
 
 /// Accepted export formats, matching the Kotlin `when (format.lowercase())`.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
@@ -128,6 +128,9 @@ pub fn export_thread(
     format: ExportFormat,
     exported_at: i64,
 ) -> Result<ExportResult, VukkoError> {
+    // A missing thread is NOT_FOUND, not an empty export: silently producing a
+    // file for a thread the database does not have hides the caller's bug.
+    thread_repository::get(conn, thread_id)?;
     let messages = message_repository::list(conn, thread_id)?;
     let content = match format {
         ExportFormat::Markdown => render_markdown(thread_id, &messages),

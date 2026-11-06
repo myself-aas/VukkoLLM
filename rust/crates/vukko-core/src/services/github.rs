@@ -759,6 +759,11 @@ mod tests {
 
     use super::*;
     /// Records the verb and replays one canned response.
+    ///
+    /// `status == 0` means the transport itself failed (no connection, DNS
+    /// failure, timeout): a real HTTP client returns `Err` there and never reports
+    /// status 0, and the fake has to be able to say the same thing, or the
+    /// "unreachable" test would only ever exercise the unknown-status branch.
     pub struct FakeGitHubTransport {
         status: u16,
         body: String,
@@ -777,6 +782,20 @@ mod tests {
         fn calls(&self) -> usize {
             self.verbs.lock().map(|verbs| verbs.len()).unwrap_or(0)
         }
+
+        /// The canned response, or the transport failure `status == 0` stands for.
+        fn outcome(&self) -> Result<HttpOutcome, ProviderError> {
+            if self.status == 0 {
+                return Err(ProviderError::network(
+                    "connection refused (fake transport)",
+                    true,
+                ));
+            }
+            Ok(HttpOutcome {
+                status: self.status,
+                body: self.body.clone(),
+            })
+        }
     }
 
     #[async_trait]
@@ -787,10 +806,7 @@ mod tests {
             _headers: Vec<(String, String)>,
         ) -> Result<HttpOutcome, ProviderError> {
             self.verbs.lock().expect("lock").push("GET".to_string());
-            Ok(HttpOutcome {
-                status: self.status,
-                body: self.body.clone(),
-            })
+            self.outcome()
         }
 
         async fn post(
@@ -800,10 +816,7 @@ mod tests {
             _body: String,
         ) -> Result<HttpOutcome, ProviderError> {
             self.verbs.lock().expect("lock").push("POST".to_string());
-            Ok(HttpOutcome {
-                status: self.status,
-                body: self.body.clone(),
-            })
+            self.outcome()
         }
     }
 

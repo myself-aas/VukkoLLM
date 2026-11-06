@@ -13,7 +13,9 @@ concurrency:
 jobs:
   build:
     name: iOS build
-    runs-on: macos-14
+    # `macos-14` is retired for this repository: the run fails before setup with
+    # "The configuration 'macos-14-arm64-us-default' is not supported".
+    runs-on: macos-latest
     timeout-minutes: 60
     steps:
       - uses: actions/checkout@v5

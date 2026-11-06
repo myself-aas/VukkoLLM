@@ -67,52 +67,17 @@ jobs:
 
       # There are no instrumentation tests in the tree (`app/src/androidTest`
       # does not exist), so `connectedDebugAndroidTest` had nothing to run and
-      # the leg proved nothing. What the smoke test has to prove is that the
-      # shipped APK installs on a device and its launcher activity survives being
-      # started — which is what this does, with the logcat of the crash printed
-      # instead of a bare exit code.
+      # the leg proved nothing. The smoke test is a script, not inline, because
+      # this action hands `script:` to `/usr/bin/sh` one line at a time — a
+      # multi-line function definition there fails with a shell syntax error
+      # before it does anything.
       - name: Instrumented smoke test on an emulator
         uses: reactivecircus/android-emulator-runner@v2
         with:
           api-level: 34
           target: google_apis
           arch: x86_64
-          script: |
-            set -uo pipefail
-            package=com.aistudio.vukko.kzmp
-            component=$package/com.vukko.MainActivity
-
-            fail() {
-              echo "::error::$1"
-              echo "--- logcat ---"
-              adb logcat -d -v brief | tail -n 300
-              adb exec-out screencap -p > emulator-failure.png || true
-              exit 1
-            }
-
-            adb wait-for-device
-            adb install -r app/build/outputs/apk/debug/app-debug.apk \
-              || fail "the debug APK did not install"
-
-            adb logcat -c
-            launch=$(adb shell am start -W -n "$component") \
-              || fail "the launcher activity did not start"
-            echo "$launch"
-            echo "$launch" | grep -q 'Status: ok' \
-              || fail "the launcher activity did not report a successful start"
-
-            # A launch that immediately dies still reports `Status: ok`, so the
-            # process has to be alive after the start returns.
-            sleep 5
-            pid=$(adb shell pidof "$package" | tr -d '\r')
-            [ -n "$pid" ] || fail "the app process exited after launching"
-            echo "app is running as pid $pid"
-
-            # The resumed activity is the one on screen; a crash-and-restart
-            # cycle would leave the process alive but nothing resumed.
-            adb shell dumpsys activity activities \
-              | grep -E "ResumedActivity.*\b$package\b" \
-              || fail "no Vukko activity is resumed after launch"
+          script: sh scripts/android-smoke-test.sh
 
       - name: Keep the emulator screenshot of a failure
         if: failure()
