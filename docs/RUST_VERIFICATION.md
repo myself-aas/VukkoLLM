@@ -14,8 +14,8 @@ build.
 | Legacy Room ASCII contract (DDL, defaults, indexes, ordering, JSON columns, failure modes) | `tests/migration/fixtures/baseline.test.js` against a real SQLite engine (`node:sqlite`) | same, plus golden fixtures exported from the Kotlin app |
 | Room ↔ Rust migration behaviour | **nothing local** — the migration logic is Rust | `cargo test -p vukko-db` on fixture databases produced by `scripts/build-fixtures.cjs` |
 | Rust domain/repository/provider/bridge code | **nothing local**; enforced by the same behaviour also being implemented and tested in JavaScript — `tests/support/engine.cjs` for the repositories, `tests/migration/support/adopt.cjs` for adoption, `src/services/providers` for wire parsing, `src/services/chatService.ts` for the streaming lifecycle — so the contract of every Rust module is executable here | `cargo fmt --check`, `cargo clippy -D warnings`, `cargo test` |
-| Android host (package id, signing, launch) | static invariants only (`tests/baseline/invariants.test.js`) | `./gradlew assembleDebug`, instrumentation tests |
-| iOS host | nothing | Xcode build on a macOS runner |
+| Android host (package id, signing, launch) | static invariants only (`tests/baseline/invariants.test.js`) | `gradle :app:assembleDebug` at the repository root (the Gradle root, not `android/`), plus unit tests and an emulator install-and-launch smoke test in `e2e.yml` |
+| iOS host | nothing | none yet — `ios/` is generated in phase 1, so `ios.yml` reports its absence instead of failing on a missing directory |
 
 ## Consequences that are enforced, not just noted
 

@@ -154,6 +154,26 @@ fn state_path_for(path: &Path) -> PathBuf {
     PathBuf::from(name)
 }
 
+/// The 16 bytes every SQLite database file starts with.
+const SQLITE_MAGIC: &[u8] = b"SQLite format 3\0";
+
+/// True when the existing file at `path` is a SQLite database, or is empty
+/// (which SQLite treats as a new database).
+///
+/// `Connection::open` is lazy: it accepts any bytes and only fails on the first
+/// read, with a generic SQL error that names neither the file nor the problem.
+/// Reading the magic here is what makes "this is not a database" a corruption
+/// report, and it does so before anything is written next to the file.
+fn has_sqlite_header(path: &Path) -> DbResult<bool> {
+    use std::io::Read;
+
+    let file = fs::File::open(path)?;
+    let mut reader = file.take(SQLITE_MAGIC.len() as u64);
+    let mut header = Vec::with_capacity(SQLITE_MAGIC.len());
+    reader.read_to_end(&mut header)?;
+    Ok(header.is_empty() || header.as_slice() == SQLITE_MAGIC)
+}
+
 /// Validates a migrated database: integrity, referential integrity, and that no
 /// legacy row disappeared.
 fn validate(conn: &Connection, expected: &[(&'static str, i64)]) -> DbResult<()> {
@@ -265,6 +285,16 @@ pub fn adopt(path: &Path) -> DbResult<(Connection, AdoptionReport)> {
             }
         }
         let _ = fs::remove_file(&state_path);
+    }
+
+    // Step 1: an existing file must actually be a database. Refused before the
+    // backup is written, so the refusal leaves the file byte-identical and no
+    // stray `.premigration-backup` beside it.
+    if existed && !has_sqlite_header(path)? {
+        return Err(DbError::Corrupted {
+            path: path.to_path_buf(),
+            message: "file does not begin with the SQLite header".to_string(),
+        });
     }
 
     // Step 2: back the file up before writing anything.
@@ -602,6 +632,12 @@ mod tests {
         let bytes = fs::read(&path).unwrap();
         assert_eq!(bytes.len(), 8192);
         assert!(bytes.iter().all(|byte| *byte == 0xff));
+        // Nothing was written beside it either: a file that cannot be a database
+        // is never migrated, so it never needs a pre-migration backup.
+        assert!(
+            !backup_path_for(&path).exists(),
+            "a refused file must not be backed up"
+        );
         let _ = fs::remove_file(&path);
     }
 

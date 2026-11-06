@@ -15,44 +15,47 @@ jobs:
     timeout-minutes: 60
     environment: production
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
+      - uses: actions/checkout@v5
+      - uses: actions/setup-node@v5
         with:
           node-version-file: .nvmrc
           cache: 'npm'
-      - uses: actions/setup-java@v4
+      # Same JDK as the debug build: app/build.gradle.kts targets Java 21.
+      - uses: actions/setup-java@v5
         with:
           distribution: temurin
-          java-version: '17'
-      # Toolchain and targets come from rust/rust-toolchain.toml.
-      - uses: actions-rust-lang/setup-rust-toolchain@v1
+          java-version: '21'
 
-      - name: Cache Gradle
-        uses: actions/cache@v4
+      # The Gradle root is the repository root and no wrapper is committed; see
+      # the comment at the top of android.yml.
+      - uses: gradle/actions/setup-gradle@v4
         with:
-          path: |
-            ~/.gradle/caches
-            ~/.gradle/wrapper
-          key: gradle-release-${{ runner.os }}-${{ hashFiles('**/*.gradle*', 'gradle/wrapper/gradle-wrapper.properties') }}
-          restore-keys: gradle-release-${{ runner.os }}-
+          gradle-version: '8.13'
 
       - run: npm ci
 
+      # The keystore lands next to the module that signs with it. It is restored
+      # into `${rootDir}`-relative `app/`, not the `android/app/` path this
+      # workflow used to name: that directory is the React Native host from
+      # MIGRATION_PLAN.md phase 1 and does not exist yet.
       - name: Restore the keystore
         run: |
-          echo "${{ secrets.ANDROID_KEYSTORE_BASE64 }}" | base64 -d > android/app/vukko-release.keystore
+          echo "${{ secrets.ANDROID_KEYSTORE_BASE64 }}" | base64 -d > app/vukko-release.keystore
 
+      # Known gap: app/build.gradle.kts declares no `release` signingConfig yet,
+      # so VUKKO_KEY_* are exported for the step that will consume them and the
+      # bundle is unsigned until that block is added. Wiring signing into the
+      # module is a schema-of-the-build decision, not a workflow fix.
       - name: Assemble the release bundle
-        working-directory: android
         env:
           VUKKO_KEYSTORE_PASSWORD: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
           VUKKO_KEY_ALIAS: ${{ secrets.ANDROID_KEY_ALIAS }}
           VUKKO_KEY_PASSWORD: ${{ secrets.ANDROID_KEY_PASSWORD }}
-        run: ./gradlew bundleRelease --no-daemon
+        run: gradle :app:bundleRelease --no-daemon --stacktrace
 
       - uses: actions/upload-artifact@v4
         with:
           name: vukko-release-aab
-          path: android/app/build/outputs/bundle/release/*.aab
+          path: app/build/outputs/bundle/release/*.aab
           if-no-files-found: error
           retention-days: 30
