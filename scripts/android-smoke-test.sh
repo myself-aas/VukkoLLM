@@ -16,9 +16,19 @@ PACKAGE=com.aistudio.vukko.kzmp
 ACTIVITY="$PACKAGE/com.vukko.MainActivity"
 APK=app/build/outputs/apk/debug/app-debug.apk
 
+# How long a cold start on a software-rendered emulator may take before the leg
+# gives up. The check below is about the app being alive, not about the clock.
+START_TIMEOUT=30
+
 diagnostics() {
-  echo "--- logcat (last 300 lines) ---"
-  adb logcat -d -v brief | tail -n 300 || true
+  echo "--- fatal exceptions (logcat crash buffer) ---"
+  adb logcat -d -b crash -v brief | tail -n 100 || true
+  echo "--- logcat for $PACKAGE ---"
+  adb logcat -d -v brief | grep -iE "vukko|AndroidRuntime|FATAL" | tail -n 150 || true
+  echo "--- processes matching the package ---"
+  adb shell ps -A | grep -i vukko || echo "(none)"
+  echo "--- logcat (last 100 lines) ---"
+  adb logcat -d -v brief | tail -n 100 || true
   # Picked up by the "Keep the emulator screenshot of a failure" step.
   adb exec-out screencap -p > emulator-failure.png || true
 }
@@ -27,6 +37,10 @@ fail() {
   echo "::error::$1"
   diagnostics
   exit 1
+}
+
+package_pid() {
+  adb shell pidof "$PACKAGE" 2>/dev/null | tr -d '\r' || true
 }
 
 adb wait-for-device
@@ -38,13 +52,28 @@ echo "$launch"
 echo "$launch" | grep -q 'Status: ok' ||
   fail "the launcher activity did not report a successful start"
 
-# A launch that dies immediately still reports `Status: ok`, so the process has to
-# be alive afterwards — and the resumed activity has to be ours, because a
-# crash-and-restart loop can leave a process behind with nothing on screen.
-sleep 5
-pid=$(adb shell pidof "$PACKAGE" | tr -d '\r' || true)
-[ -n "$pid" ] || fail "the app process exited after launching"
+# A cold start on this emulator is slow, so wait for the process instead of
+# assuming it is already there — but bound the wait, because a process that never
+# appears is exactly the crash this test exists to catch.
+waited=0
+pid=$(package_pid)
+while [ -z "$pid" ] && [ "$waited" -lt "$START_TIMEOUT" ]; do
+  sleep 2
+  waited=$((waited + 2))
+  pid=$(package_pid)
+done
+if [ -z "$pid" ]; then
+  fail "the app process never appeared after launching (waited ${START_TIMEOUT}s)"
+fi
 echo "the app is running as pid $pid"
+
+# A launch that dies immediately still reports `Status: ok`, and a crash loop
+# leaves a process behind with nothing on screen, so the app has to still be
+# running, and resumed, a few seconds after it came up.
+sleep 5
+pid=$(package_pid)
+[ -n "$pid" ] || fail "the app process exited after launching"
+echo "the app is still running as pid $pid"
 
 adb shell dumpsys activity activities | grep -E "ResumedActivity.*$PACKAGE" ||
   fail "no Vukko activity is resumed after launching"
