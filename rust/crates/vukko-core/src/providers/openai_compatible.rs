@@ -284,12 +284,15 @@ mod tests {
             .expect("request builds");
         let body: Value = serde_json::from_str(&prepared.body).expect("body is JSON");
 
-        // The image rides on the last user turn, which is index 2 here.
-        assert_eq!(body["messages"][2]["content"][1]["type"], "image_url");
-        assert_eq!(
-            body["messages"][2]["content"][1]["image_url"]["url"],
-            PNG_DATA_URI
-        );
+        // The image rides on the last user turn, which is the final message here
+        // (`sample_request` is USER, ASSISTANT, USER after the system prompt) —
+        // asserted on the last element rather than an index so a fixture change
+        // cannot point this test at an assistant turn and silently pass.
+        let messages = body["messages"].as_array().expect("messages is an array");
+        let last = messages.last().expect("the body has messages");
+        assert_eq!(last["role"], "user");
+        assert_eq!(last["content"][1]["type"], "image_url");
+        assert_eq!(last["content"][1]["image_url"]["url"], PNG_DATA_URI);
     }
 
     #[tokio::test]

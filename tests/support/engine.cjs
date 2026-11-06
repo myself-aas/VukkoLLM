@@ -269,7 +269,9 @@ function createEngine(databasePath) {
   const workspaces = {
     async list() {
       return db
-        .prepare('SELECT * FROM workspaces ORDER BY createdAt ASC, id ASC')
+        // `rowid` breaks the tie: seeded and adopted workspaces share one
+        // createdAt, and insertion order is the order the Kotlin app displayed.
+        .prepare('SELECT * FROM workspaces ORDER BY createdAt ASC, rowid ASC')
         .all()
         .map(workspaceFromRow);
     },

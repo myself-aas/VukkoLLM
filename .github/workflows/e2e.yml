@@ -18,8 +18,8 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 20
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
+      - uses: actions/checkout@v5
+      - uses: actions/setup-node@v5
         with:
           node-version-file: .nvmrc
           cache: 'npm'
@@ -33,15 +33,30 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 45
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
-        with:
-          node-version-file: .nvmrc
-          cache: 'npm'
-      - uses: actions/setup-java@v4
+      - uses: actions/checkout@v5
+
+      - uses: actions/setup-java@v5
         with:
           distribution: temurin
-          java-version: '17'
+          java-version: '21'
+
+      # The Gradle root is the repository root and there is no committed wrapper;
+      # see the comment at the top of android.yml.
+      - uses: gradle/actions/setup-gradle@v4
+        with:
+          gradle-version: '8.13'
+
+      - name: Create the debug keystore
+        run: |
+          keytool -genkeypair -v \
+            -keystore debug.keystore \
+            -storepass android -keypass android \
+            -alias androiddebugkey \
+            -keyalg RSA -keysize 2048 -validity 10000 \
+            -dname "CN=Android Debug,O=Android,C=US"
+
+      - name: Build the debug APK for the emulator
+        run: gradle :app:assembleDebug --no-daemon --stacktrace
 
       - name: Enable KVM
         run: |
@@ -50,13 +65,25 @@ jobs:
           sudo udevadm control --reload-rules
           sudo udevadm trigger --name-match=kvm
 
-      - run: npm ci
-
+      # There are no instrumentation tests in the tree (`app/src/androidTest`
+      # does not exist), so `connectedDebugAndroidTest` had nothing to run and
+      # the leg proved nothing. The smoke test is a script, not inline, because
+      # this action hands `script:` to `/usr/bin/sh` one line at a time — a
+      # multi-line function definition there fails with a shell syntax error
+      # before it does anything.
       - name: Instrumented smoke test on an emulator
         uses: reactivecircus/android-emulator-runner@v2
         with:
           api-level: 34
           target: google_apis
           arch: x86_64
-          script: |
-            cd android && ./gradlew connectedDebugAndroidTest --no-daemon
+          script: sh scripts/android-smoke-test.sh
+
+      - name: Keep the emulator screenshot of a failure
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: emulator-failure
+          path: emulator-failure.png
+          if-no-files-found: ignore
+          retention-days: 7

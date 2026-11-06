@@ -346,11 +346,17 @@ mod tests {
     use rusqlite::Connection;
 
     fn fresh() -> (Connection, std::path::PathBuf) {
+        use std::sync::atomic::{AtomicU64, Ordering};
+
+        // Unique per call, not merely per millisecond: these tests run in
+        // parallel and two of them starting in the same tick would share a file.
+        static SEQUENCE: AtomicU64 = AtomicU64::new(0);
         let mut path = std::env::temp_dir();
         path.push(format!(
-            "vukko-bootstrap-{}-{}.db",
+            "vukko-bootstrap-{}-{}-{}.db",
             std::process::id(),
-            crate::repository::now_millis()
+            crate::repository::now_millis(),
+            SEQUENCE.fetch_add(1, Ordering::Relaxed)
         ));
         let _ = std::fs::remove_file(&path);
         let (conn, _) = vukko_db::adopt(&path).expect("adopt");

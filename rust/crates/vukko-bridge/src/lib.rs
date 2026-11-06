@@ -68,6 +68,10 @@ pub struct Engine {
     conn: Mutex<Connection>,
     path: PathBuf,
     adoption: AdoptionReport,
+    /// Whether this launch performed the first-run seed. Stored rather than
+    /// derived from the schema version so `initialize()` reports what actually
+    /// happened instead of what should have happened.
+    seeded: bool,
     events: EventSink,
 }
 
@@ -82,14 +86,21 @@ impl fmt::Debug for Engine {
 }
 
 impl Engine {
-    /// Opens (and upgrades) the database, then seeds a fresh install.
+    /// Opens (and upgrades) the database, seeding only a fresh install.
     pub fn open(path: impl AsRef<Path>) -> Result<Self, BridgeError> {
         let path = path.as_ref().to_path_buf();
         let (mut conn, adoption) = vukko_db::adopt(&path)?;
-        // Seeding happens once, on a fresh install, and the result used to be
-        // discarded: `true` is the only record of where the default workspace
-        // came from, so it is put in the log instead of dropped on the floor.
-        let seeded = bootstrap::seed_if_empty(&mut conn).map_err(BridgeError::from)?;
+        // Seeding is a first-run step, not a repair step: only a database that
+        // did not exist before this call gets the demo set. A database adopted
+        // from the Kotlin app keeps exactly the rows it had — an install whose
+        // workspaces the user deleted must not have four demo workspaces pushed
+        // back in, which is also what "adoption preserves every row" means.
+        let fresh_install = adoption.from_version == 0;
+        let seeded = if fresh_install {
+            bootstrap::seed_if_empty(&mut conn).map_err(BridgeError::from)?
+        } else {
+            false
+        };
         if seeded {
             tracing::info!("seeded a fresh database");
         }
@@ -98,6 +109,7 @@ impl Engine {
             conn: Mutex::new(conn),
             path,
             adoption,
+            seeded,
             events: EventSink::new(),
         })
     }
@@ -129,7 +141,7 @@ impl Engine {
             migrations_applied: self.adoption.migrations_applied,
             migrated_from_legacy: self.adoption.migrated_from_legacy,
             workspace_count,
-            seeded: self.adoption.from_version == 0,
+            seeded: self.seeded,
             warnings: self.adoption.warnings.clone(),
         })
     }
@@ -379,7 +391,9 @@ mod tests {
         let state = engine.initialize().expect("initialize");
         assert!(state.migrated_from_legacy);
         assert!(state.migrations_applied > 0);
-        // A legacy database with no workspaces is seeded only after adoption.
+        // Adoption adds no rows: an install whose workspaces the user deleted
+        // stays empty, rather than being refilled with the demo set on upgrade.
+        assert!(!state.seeded);
         assert_eq!(state.workspace_count, 0);
         let _ = std::fs::remove_file(&path);
     }
